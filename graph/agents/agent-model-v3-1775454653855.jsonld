@@ -1,0 +1,10 @@
+{
+  "@context": "sevo://v1",
+  "@type": "Agent",
+  "@id": "agent:model-v3-1775454653855",
+  "timestamp": "2026-04-06T05:50:53.855Z",
+  "blueprint": "./blueprints/model-v3.ts",
+  "generation": 3,
+  "status": "active",
+  "domain": "human-model-quality"
+}
