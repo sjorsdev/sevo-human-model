@@ -1,0 +1,14 @@
+{
+  "@context": "sevo://v1",
+  "@type": "SeedImprovement",
+  "@id": "evolution-cycle-3-1775477690604",
+  "timestamp": "2026-04-06T12:14:50.604Z",
+  "observation": "Cycle 3: 1 models, best=0.238, weakness: Looking at the code: **The model gates nearly everything through a single \"precision\" scalar and Act",
+  "suggestion": "Focus on: Looking at the code: **The model gates nearly everything through a single \"precision\" scalar and Active Inference surprise-minimization, but human psy",
+  "evidence": [
+    "cycle:3",
+    "best-fitness:0.238",
+    "population:1"
+  ],
+  "priority": 5
+}
