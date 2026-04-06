@@ -993,6 +993,142 @@ function applyDissonanceDetector(
   return { ...response, emotion, behavior, rootCause, process };
 }
 
+// ─── Minimal Active Inference Engine (Friston 2010) ──────────────────
+// Person = generative model with priors + global precision (inverse variance).
+// Math: F = Σ_k precision * |priors[k] - observed[k]|
+//       mode = assimilate (F < Θ_low) | accommodate (Θ_low ≤ F < Θ_high) | act (F ≥ Θ_high)
+// High precision = rigid (OCD, PTSD); low precision = fluid (mania, creativity).
+// Wraps attribution/regulatory/dissonance layers as downstream modulators.
+// Source: Friston, K. (2010). The free-energy principle. Nature Reviews Neuroscience, 11, 127–138.
+
+interface ActiveInferenceState {
+  priors: Record<string, number>;       // person's current world model
+  precision: number;                    // global belief rigidity
+  freeEnergy: number;                   // F = Σ precision * |priors[k] - observed[k]|
+  surprise: number;                     // normalized F ∈ [0,1]
+  mode: "assimilate" | "accommodate" | "act";
+  updatedPriors: Record<string, number>;
+}
+
+const AI_THRESHOLD_LOW  = 0.8;  // below: assimilate quietly
+const AI_THRESHOLD_HIGH = 2.0;  // above: act to reduce surprise
+
+// Derive person-level precision from Big Five traits
+// Neuroticism + conscientiousness → rigid predictions (high precision)
+// Openness → fluid predictions (low precision)
+function derivePrecision(traits: Record<string, number>): number {
+  const N = traits["neuroticism"]       ?? 0.5;
+  const C = traits["conscientiousness"] ?? 0.5;
+  const O = traits["openness"]          ?? 0.5;
+  return Math.max(0.5, Math.min(8.0, 2.0 + N * 3.0 + C * 1.5 - O * 2.5));
+}
+
+// Extract situational features as observed values ∈ [0,1]
+function extractFeatures(situation: Situation): Record<string, number> {
+  const { stimulus, person, context } = situation;
+  const isSocial = context.socialSetting.includes("group") ||
+                   context.socialSetting.includes("peer")  ||
+                   context.socialSetting.includes("crowd");
+  return {
+    threat:            THREAT_STIMULI.has(stimulus.type.toLowerCase()) ? stimulus.intensity : 0,
+    gain:              GAIN_STIMULI.has(stimulus.type.toLowerCase())   ? stimulus.intensity : 0,
+    novelty:           stimulus.novelty,
+    personalRelevance: stimulus.personalRelevance,
+    arousal:           person.arousal,
+    socialDemand:      isSocial ? 0.7 : 0.3,
+    intensity:         stimulus.intensity,
+  };
+}
+
+// Build person's prior world model from traits + emotional state
+function buildPersonPriors(person: Situation["person"]): Record<string, number> {
+  const t = (k: string) => person.traits[k] ?? 0.5;
+  return {
+    threat:            t("neuroticism") * 0.6,
+    gain:              t("extraversion") * 0.5,
+    novelty:           t("openness") * 0.5,
+    personalRelevance: 0.5,
+    arousal:           0.3 + t("neuroticism") * 0.3,
+    socialDemand:      t("agreeableness") * 0.5 + t("extraversion") * 0.3,
+    intensity:         t("neuroticism") * 0.4 + 0.2,
+  };
+}
+
+function runActiveInference(situation: Situation): ActiveInferenceState {
+  const priors    = buildPersonPriors(situation.person);
+  const precision = derivePrecision(situation.person.traits);
+  const observed  = extractFeatures(situation);
+
+  let freeEnergy = 0;
+  for (const key of Object.keys(observed)) {
+    freeEnergy += precision * Math.abs((priors[key] ?? 0.5) - observed[key]);
+  }
+
+  const featureCount = Object.keys(observed).length;
+  const surprise = Math.min(1.0, freeEnergy / (precision * featureCount));
+  const mode: ActiveInferenceState["mode"] =
+    freeEnergy < AI_THRESHOLD_LOW  ? "assimilate" :
+    freeEnergy < AI_THRESHOLD_HIGH ? "accommodate" : "act";
+
+  // Learning rate inversely proportional to precision: rigid minds update slowly
+  const lr = 1.0 / (1.0 + precision);
+  const updatedPriors: Record<string, number> = {};
+  for (const key of Object.keys(observed)) {
+    updatedPriors[key] = (priors[key] ?? 0.5) + lr * (observed[key] - (priors[key] ?? 0.5));
+  }
+
+  return { priors, precision, freeEnergy, surprise, mode, updatedPriors };
+}
+
+// Apply active inference state as the final pipeline modulator.
+// Precision determines whether the person can update beliefs (fluid) or must act to
+// reduce surprise through external behavior (rigid).
+function applyActiveInference(
+  situation: Situation,
+  response: Response,
+  ai: ActiveInferenceState
+): Response {
+  const { mode, precision, freeEnergy } = ai;
+  let { emotion, behavior, rootCause, process } = response;
+  const precTag = `AI:F=${freeEnergy.toFixed(2)},π=${precision.toFixed(1)},${mode}`;
+
+  if (mode === "assimilate") {
+    // Low surprise: absorb quietly.
+    // High-precision assimilation → confirmation bias (can't update even though F is low)
+    if (precision > 4.0) {
+      rootCause = `${rootCause} [AI:assimilate+rigid→confirmation-bias]`;
+    }
+  } else if (mode === "accommodate") {
+    // Moderate surprise: adjust beliefs.
+    if (precision > 4.0) {
+      // Rigid: reluctant accommodation → rationalization
+      if (behavior !== "justify-prior-choice") behavior = "justify-prior-choice";
+      rootCause = `${rootCause} [AI:accommodate+rigid→rationalization]`;
+    } else if (precision < 1.5) {
+      // Fluid: ready accommodation → belief update
+      behavior = "update-belief";
+      if (emotion === "anxious") emotion = "curious";
+      rootCause = `${rootCause} [AI:accommodate+fluid→belief-update]`;
+    }
+  } else {
+    // act: must reduce surprise through behavior.
+    if (precision > 5.0) {
+      // OCD/PTSD: compulsive precision maintenance — ritualize or hypervigilance
+      if (["continue", "update-belief"].includes(behavior)) behavior = "ritualize";
+      if (["content", "happy", "excited"].includes(emotion)) emotion = "anxious";
+      rootCause = `${rootCause} [AI:act+hyperrigid(π=${precision.toFixed(1)})→compulsive-control]`;
+    } else if (precision < 1.5) {
+      // Mania/creativity: impulsive exploration
+      if (["freeze", "appease", "withdrawal", "avoidance"].includes(behavior)) behavior = "approach";
+      rootCause = `${rootCause} [AI:act+fluid(π=${precision.toFixed(1)})→impulsive-exploration]`;
+    } else {
+      rootCause = `${rootCause} [AI:act(F=${freeEnergy.toFixed(2)})→surprise-reduction]`;
+    }
+  }
+
+  return { ...response, emotion, behavior, rootCause, process: `${process} | ${precTag}` };
+}
+
 // Threshold above which an attractor basin overrides domain template behavior.
 // Models: habit formation, trauma lock-in, psychopathology rigidity.
 const ATTRACTOR_OVERRIDE_DEPTH = 3.0;
@@ -1001,6 +1137,11 @@ export function predict(situation: Situation): Response {
   const { person, stimulus } = situation;
   const obs = stimulus.personalRelevance; // 0–1 observation
   const arousal = person.arousal ?? 0.5;   // precision multiplier
+
+  // ── Active Inference Engine (Friston 2010) ────────────────────────
+  // Primary driver: ALL behavior is surprise minimization.
+  // Person-level precision gates downstream need-space inference.
+  const aiState = runActiveInference(situation);
 
   // Infer domain and load calibrated priors
   const domain = inferDomain(situation);
@@ -1016,6 +1157,9 @@ export function predict(situation: Situation): Response {
   );
 
   // Build priors from person's needs (fall back to generic prior)
+  // Person-level precision (from active inference) scales all need precisions.
+  // High global precision → amplifies need-space F (more urgency); low → dampens.
+  const precisionScale = Math.sqrt(aiState.precision / 2.0); // normalize around baseline=2.0
   let maxF = -1;
   let dominantNeed = "unknown";
 
@@ -1027,7 +1171,7 @@ export function predict(situation: Situation): Response {
     const prior: NeedPrior = domainPriors[key] ?? NEED_PRIORS[key] ?? { expected: 0.4, precision: 1.0 };
     const traitMod = traitPrecisionMod(person.traits, key);
     const vagalMod = precisionMult[key] ?? 1.0; // polyvagal gate
-    const scaledPrecision = prior.precision * traitMod * (0.5 + arousal) * vagalMod;
+    const scaledPrecision = prior.precision * traitMod * (0.5 + arousal) * vagalMod * precisionScale;
     const pe = Math.abs(obs - prior.expected);
     const F = pe * pe * scaledPrecision;
     if (F > maxF) { maxF = F; dominantNeed = need; }
@@ -1116,28 +1260,33 @@ export function predict(situation: Situation): Response {
   // Behavior forced to freeze or withdrawal regardless of domain template.
   if (autonomicState === "SHUTDOWN") {
     const shutdownBehavior = arousal > 0.85 ? "freeze" : "withdrawal";
-    return {
+    const shutdownBase = {
       ...regulated,
       behavior: shutdownBehavior,
       process: `${regulated.process} | ${vagalTag}→${shutdownBehavior}`,
       rootCause: `${regulated.rootCause} [polyvagal:SHUTDOWN — dorsal-vagal collapse, safety-only processing]`,
     };
+    return applyActiveInference(situation, shutdownBase, aiState);
   }
 
   if (depth >= ATTRACTOR_OVERRIDE_DEPTH) {
     // Pathological/habitual rigidity: template refines rootCause/process, attractor locks behavior
-    return {
+    const attractorBase = {
       ...regulated,
       behavior: attractor.name,
       process: `${regulated.process} | ${attractorTag}[override]`,
       rootCause: `${regulated.rootCause} [rigid-basin:${attractor.name},depth=${depth.toFixed(1)}]`,
     };
+    return applyActiveInference(situation, attractorBase, aiState);
   }
 
-  return {
+  // ── Active Inference final pass ───────────────────────────────────
+  // Primary driver: precision gates belief updates vs. active behavior.
+  // Clinical predictions: high-π (OCD/PTSD) → rigid; low-π (mania) → fluid.
+  return applyActiveInference(situation, {
     ...regulated,
     process: `${regulated.process} | ${attractorTag} | ${rfTag}`,
-  };
+  }, aiState);
 }
 
 // ─── Semantic Scoring ────────────────────────────────────────────────
