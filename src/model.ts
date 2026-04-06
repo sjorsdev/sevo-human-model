@@ -182,6 +182,63 @@ function inferDomain(situation: Situation): string {
 const THREAT_STIMULI = new Set(["threat", "loss", "rejection", "failure", "danger", "conflict", "criticism"]);
 const GAIN_STIMULI   = new Set(["reward", "success", "praise", "opportunity", "connection", "discovery", "achievement"]);
 
+// ─── Polyvagal Gate (Porges 1994) ────────────────────────────────────
+// Autonomic state pre-filters which needs are reachable before active inference.
+// Three circuits map to Porges' three vagal pathways:
+//   SAFE     → ventral vagal: full need-space active, baseline precision
+//   MOBILIZED → sympathetic: safety/esteem/fairness amplified ×2, others dampened
+//   SHUTDOWN  → dorsal vagal: collapse all needs to safety ×5, behavior forced to withdrawal/freeze
+//
+// Math: autonomicState = argmax{ SAFE: σ(−arousal), MOBILIZED: σ(arousal−0.4)×threatFlag,
+//                                SHUTDOWN: σ(arousal−0.75)×(historyDepth/5) }
+// Precision_need *= stateMultiplier[autonomicState][need]
+
+type AutonomicState = "SAFE" | "MOBILIZED" | "SHUTDOWN";
+
+function _sigmoid(x: number): number {
+  return 1 / (1 + Math.exp(-x * 6)); // steep sigmoid for clear state transitions
+}
+
+function computeAutonomicState(
+  arousal: number,
+  stimulusType: string,
+  history: string[]
+): { state: AutonomicState; precisionMult: Record<string, number> } {
+  const threatFlag = THREAT_STIMULI.has(stimulusType.toLowerCase()) ? 1 : 0;
+  const historyDepth = Math.min(history.length, 5);
+
+  const scoreSafe      = _sigmoid(-arousal + 0.5);           // peaks when arousal low
+  const scoreMobilized = _sigmoid(arousal - 0.4) * (0.5 + threatFlag * 0.5);
+  const scoreShutdown  = _sigmoid(arousal - 0.75) * (historyDepth / 5);
+
+  let state: AutonomicState;
+  if (scoreShutdown > scoreMobilized && scoreShutdown > scoreSafe) {
+    state = "SHUTDOWN";
+  } else if (scoreMobilized > scoreSafe) {
+    state = "MOBILIZED";
+  } else {
+    state = "SAFE";
+  }
+
+  // Per-need precision multipliers per autonomic state
+  const PRECISION_MULTS: Record<AutonomicState, Record<string, number>> = {
+    SAFE: {
+      safety: 1.0, belonging: 1.0, esteem: 1.0, autonomy: 1.0,
+      achievement: 1.0, fairness: 1.0, understanding: 1.0, pleasure: 1.0,
+    },
+    MOBILIZED: {
+      safety: 2.0, belonging: 1.2, esteem: 2.0, autonomy: 0.7,
+      achievement: 0.5, fairness: 2.0, understanding: 0.5, pleasure: 0.3,
+    },
+    SHUTDOWN: {
+      safety: 5.0, belonging: 0.2, esteem: 0.1, autonomy: 0.1,
+      achievement: 0.1, fairness: 0.1, understanding: 0.1, pleasure: 0.1,
+    },
+  };
+
+  return { state, precisionMult: PRECISION_MULTS[state] };
+}
+
 // ─── Attractor Landscape Dynamics ────────────────────────────────────
 // Person = dynamical system; 3–5 stable attractor states per domain.
 // Stimulus applies a force vector; response = attractor basin that captures trajectory.
@@ -639,6 +696,15 @@ export function predict(situation: Situation): Response {
   const domain = inferDomain(situation);
   const domainPriors = DOMAIN_PRIORS[domain] ?? {};
 
+  // ── Polyvagal Gate ────────────────────────────────────────────────
+  // Autonomic state gates which attractor basins are reachable and modulates
+  // need-precision before active inference runs.
+  const { state: autonomicState, precisionMult } = computeAutonomicState(
+    arousal,
+    stimulus.type,
+    person.history ?? []
+  );
+
   // Build priors from person's needs (fall back to generic prior)
   let maxF = -1;
   let dominantNeed = "unknown";
@@ -650,7 +716,8 @@ export function predict(situation: Situation): Response {
     // Domain prior takes precedence; fall back to base prior
     const prior: NeedPrior = domainPriors[key] ?? NEED_PRIORS[key] ?? { expected: 0.4, precision: 1.0 };
     const traitMod = traitPrecisionMod(person.traits, key);
-    const scaledPrecision = prior.precision * traitMod * (0.5 + arousal);
+    const vagalMod = precisionMult[key] ?? 1.0; // polyvagal gate
+    const scaledPrecision = prior.precision * traitMod * (0.5 + arousal) * vagalMod;
     const pe = Math.abs(obs - prior.expected);
     const F = pe * pe * scaledPrecision;
     if (F > maxF) { maxF = F; dominantNeed = need; }
@@ -702,12 +769,13 @@ export function predict(situation: Situation): Response {
   }
 
   const attractorTag = `attractor:${attractor.name}(depth=${depth.toFixed(1)})`;
+  const vagalTag = `vagal:${autonomicState}`;
 
   const confidence = Math.min(0.9, 0.4 + pe * 1.2 + (depth >= ATTRACTOR_OVERRIDE_DEPTH ? 0.1 : 0));
 
   const baseResponse: Response = {
     rootCause: `${dominantNeed} need [${domain}] — PE=${pe.toFixed(2)}, basin=${attractor.name}${depth >= ATTRACTOR_OVERRIDE_DEPTH ? " [locked]" : ""}`,
-    process: `active-inference+attractor: F=${maxF.toFixed(3)}, PE=${pe.toFixed(2)}, ${attractorTag}, arousal=${arousal}`,
+    process: `active-inference+attractor: F=${maxF.toFixed(3)}, PE=${pe.toFixed(2)}, ${attractorTag}, ${vagalTag}, arousal=${arousal}`,
     emotion,
     behavior,
     confidence,
@@ -715,6 +783,19 @@ export function predict(situation: Situation): Response {
 
   // Apply domain templates; deep attractors re-assert behavior afterward
   const templated = applyDomainTemplate(domain, situation, baseResponse);
+
+  // ── Polyvagal SHUTDOWN override ───────────────────────────────────
+  // Dorsal vagal collapse: no deep esteem/autonomy attractor can fire.
+  // Behavior forced to freeze or withdrawal regardless of domain template.
+  if (autonomicState === "SHUTDOWN") {
+    const shutdownBehavior = arousal > 0.85 ? "freeze" : "withdrawal";
+    return {
+      ...templated,
+      behavior: shutdownBehavior,
+      process: `${templated.process} | ${vagalTag}→${shutdownBehavior}`,
+      rootCause: `${templated.rootCause} [polyvagal:SHUTDOWN — dorsal-vagal collapse, safety-only processing]`,
+    };
+  }
 
   if (depth >= ATTRACTOR_OVERRIDE_DEPTH) {
     // Pathological/habitual rigidity: template refines rootCause/process, attractor locks behavior
