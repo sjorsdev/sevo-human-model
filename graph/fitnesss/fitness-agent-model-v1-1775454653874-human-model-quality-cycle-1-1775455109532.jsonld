@@ -1,0 +1,38 @@
+{
+  "@context": "sevo://v1",
+  "@type": "Fitness",
+  "@id": "fitness-agent-model-v1-1775454653874-human-model-quality-cycle-1-1775455109532",
+  "timestamp": "2026-04-06T05:59:37.011Z",
+  "agent": "agent:model-v1-1775454653874",
+  "eqs": 0.012528343031100096,
+  "accuracy": 0,
+  "magnitude": 0,
+  "branchesExplored": 1,
+  "predictionError": 1,
+  "cycleId": "human-model-quality-cycle-1-1775455109532",
+  "context": {
+    "fitness": 0.03132085757775024,
+    "accuracy": 0.32,
+    "coverage": 0.39,
+    "coherence": 0.664,
+    "primitiveCount": 7,
+    "strengths": [
+      "Three-drive framework (safety, belonging, competence) is intuitive and maps to established motivation theory (Maslow, self-determination)",
+      "Handles social phenomena well: Asch, anxious attachment, emotional contagion correctly attribute to belonging-drive",
+      "Fear response prediction is accurate",
+      "Recognizes drive competition/conflict (Framing Effect, Learned Helplessness) showing some compositional thinking"
+    ],
+    "weaknesses": [
+      "Accuracy failures on 9/18 benchmarks—model misattributes root causes: addiction as safety-avoidance (wrong: reward-seeking), loss aversion as competence-seeking (wrong: loss sensitivity), overjustification as belonging (wrong: intrinsic/extrinsic motivation dynamic)",
+      "Cognitive biases (anchoring, confirmation bias, sunk cost) are mechanically mapped to drives they don't explain—these require cognitive mechanisms (heuristics, attentional bias, past-focused reasoning), not drive regulation",
+      "Response predictions reuse canned patterns ('immediate avoidance or freeze', 'seeks connection') across unrelated phenomena, indicating pattern-matching rather than principled explanation",
+      "Introversion misattribution—social energy depletion is not belonging-drive seeking; it's arousal regulation. Model confuses motive with outcome",
+      "Milgram obedience misattribution—participants obey despite empathy conflict, not because of belonging. Model inverts the mechanism",
+      "Incomplete primitive specification—'appraisal' is listed but unused; missing primitives for learning, memory, cognitive heuristics, social scripts",
+      "No explanatory mechanism for drive-to-behavior causation—why does belonging-drive produce 'maintains social harmony' in some cases and conformity in others?",
+      "Coherence breaks: cannot explain why same situation (choice overload, sunk cost) sometimes paralyzes and sometimes drives action, or why belonging-drive predicts opposite behaviors in Anxious Attachment vs Introversion"
+    ],
+    "modelName": "The Drive Machine",
+    "benchmarkCount": 18
+  }
+}
