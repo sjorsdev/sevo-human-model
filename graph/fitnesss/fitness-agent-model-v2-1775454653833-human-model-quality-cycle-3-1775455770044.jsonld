@@ -1,0 +1,37 @@
+{
+  "@context": "sevo://v1",
+  "@type": "Fitness",
+  "@id": "fitness-agent-model-v2-1775454653833-human-model-quality-cycle-3-1775455770044",
+  "timestamp": "2026-04-06T06:09:54.393Z",
+  "agent": "agent:model-v2-1775454653833",
+  "eqs": 0.04129957281840092,
+  "accuracy": 0,
+  "magnitude": 0,
+  "branchesExplored": 1,
+  "predictionError": 1,
+  "cycleId": "human-model-quality-cycle-3-1775455770044",
+  "context": {
+    "fitness": 0.1032489320460023,
+    "accuracy": 0.52,
+    "coverage": 0.63,
+    "coherence": 0.772,
+    "primitiveCount": 6,
+    "strengths": [
+      "Neuroscientifically grounded core principle (prediction error minimization is real)",
+      "Logically coherent primitives: world-model → prediction-generator → error-signal → model-updater forms a clean feedback loop",
+      "Handles some phenomena well: confirmation bias (0.7), anxiety loops (0.7), addiction (0.6)",
+      "Addresses 18 diverse benchmarks across all domains"
+    ],
+    "weaknesses": [
+      "Over-reductive: collapses 18 phenomena into ~5 repeated response templates (conforms/updates/avoids/resists). Real psychology is richer.",
+      "Accuracy failures on key benchmarks: Fear response (predicts 'cautious belief updating' but acute fear is amygdala hijack—automatic, pre-cognitive, not deliberative); Emotional contagion (predicts belief updating but it's mirror neuron mirroring—automatic, not conscious); Bystander effect (doesn't explain diffusion of responsibility—a social/group mechanism, not just error correction)",
+      "Conflates mechanistically distinct phenomena: Anxious Attachment (early relational trauma, hypervigilance) and Milgram Obedience (authority deference under instruction) both map to 'conforms to restore predicted social harmony'—they're different problems",
+      "Missing independent motivational/emotional systems: No intrinsic drives (attachment, status-seeking, autonomy, competence). Emotions reduced to error signals, not as independent utility functions or behavioral impulses (Panksepp's SEEKING/RAGE/CARE systems).",
+      "Underconstrained: prediction-error is flexible enough to retroactively explain almost anything—this makes the theory hard to falsify and suggests missing mechanisms",
+      "Can't distinguish healthy learning from pathology: Both growth mindset and rumination/anxiety loops are 'error signal processing'—needs independent mechanisms for when updating is adaptive vs. maladaptive",
+      "Incomplete: Only 4 primitives clearly described (world-model, prediction-generator, error-signal, model-updater); you mention 6 total but don't specify the other 2"
+    ],
+    "modelName": "The Prediction Engine",
+    "benchmarkCount": 18
+  }
+}
