@@ -1,0 +1,39 @@
+{
+  "@context": "sevo://v1",
+  "@type": "Fitness",
+  "@id": "fitness-agent-model-v3-1775454653855-human-model-quality-cycle-1-1775455109532",
+  "timestamp": "2026-04-06T06:00:05.095Z",
+  "agent": "agent:model-v3-1775454653855",
+  "eqs": 0.013223211591742758,
+  "accuracy": 0,
+  "magnitude": 0,
+  "branchesExplored": 1,
+  "predictionError": 1,
+  "cycleId": "human-model-quality-cycle-1-1775455109532",
+  "context": {
+    "fitness": 0.03305802897935689,
+    "accuracy": 0.48,
+    "coverage": 0.22,
+    "coherence": 0.7,
+    "primitiveCount": 5,
+    "strengths": [
+      "Strong on core social phenomena: Bystander Effect (0.8), Asch Conformity (0.7), Emotional Contagion (0.7), Fear Response (0.85) all well-explained",
+      "Clear theoretical coherence within social domain: identity-threat → face-management → observable behavior is a logical chain",
+      "Parsimonious primitives (5) with explicit relationships between them",
+      "Correctly identifies that biological threat overrides social self (Fear, Grief)",
+      "Good integration of status-tracking and belonging needs as unified framework"
+    ],
+    "weaknesses": [
+      "CRITICAL: Uses 'continues with relaxed, default social behavior' as catch-all for 7+ predictions (Anchoring, Confirmation Bias, Choice Overload, Loss Aversion, Anxiety Loop, Overjustification, Learned Helplessness). This is a default placeholder, not explanation—signals model has no machinery for these phenomena",
+      "Fundamentally misaligned: Cognitive biases and decision-making are NOT primarily social in origin. Forcing them through identity-threat lens strains coherence (Anchoring Effect (0.2), Confirmation Bias (0.2), Loss Aversion (0.2))",
+      "Introversion prediction (0.3) inverts reality: introversion is energy depletion, not confidence-signaling or status-seeking",
+      "Conflates different mechanisms: Milgram as conformity misses obedience-to-authority; Sunk Cost as identity defense misses loss aversion",
+      "Contradictory predictions: 'relaxed + anxiety' (Loss Aversion, Anxiety Loop), 'dismisses + fear' (Addiction) show internal inconsistency",
+      "Identity-threat subtypes (belonging, status, competence, identity) are declared but mechanism for differentiation is absent",
+      "Only 4/18 benchmarks scored ≥0.65—model handles 22% of phenomena competently, defaults or misfires on 78%",
+      "Poor coverage of psychopathology (Anxiety Loop, Addiction) and motivation (Overjustification, Learned Helplessness)"
+    ],
+    "modelName": "The Social Self",
+    "benchmarkCount": 18
+  }
+}
