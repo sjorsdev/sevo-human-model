@@ -1,0 +1,38 @@
+{
+  "@context": "sevo://v1",
+  "@type": "Fitness",
+  "@id": "fitness-agent-model-v2-1775454653833-human-model-quality-cycle-2-1775455412597",
+  "timestamp": "2026-04-06T06:03:55.687Z",
+  "agent": "agent:model-v2-1775454653833",
+  "eqs": 0.027587917115838956,
+  "accuracy": 0,
+  "magnitude": 0,
+  "branchesExplored": 1,
+  "predictionError": 1,
+  "cycleId": "human-model-quality-cycle-2-1775455412597",
+  "context": {
+    "fitness": 0.06896979278959739,
+    "accuracy": 0.48,
+    "coverage": 0.42,
+    "coherence": 0.8380000000000001,
+    "primitiveCount": 6,
+    "strengths": [
+      "Elegant unifying principle (minimize prediction error) rooted in neuroscience",
+      "Parsimonious: 6 primitives attempt to explain 18 phenomena across all domains",
+      "Strong explanations for threat/protective responses: anxiety loops, addiction, grief denial, loss aversion are well-captured by the 'prediction-protection' mechanism",
+      "Clear logical flow of primitives: world-model → prediction-generator → error-signal → model-updater",
+      "Good account of behavioral rigidity in psychopathology (resistance to change in anxiety/addiction)"
+    ],
+    "weaknesses": [
+      "Overfitting to protective/anxiety mechanisms: ~7 distinct phenomena (introversion, bystander effect, anchoring, confirmation bias, choice overload, framing, overjustification) receive nearly identical generic responses ('partially updates beliefs while cautiously acting'), obscuring their true causal mechanisms",
+      "Misses personality trait mechanisms: Introversion is NOT about 'prediction-error learning'—it's about physiological arousal/energy regulation, which the model doesn't address",
+      "Conflates unrelated phenomena under same labels: Confirmation Bias is active selective seeking (motivated cognition), not cautious learning; Bystander Effect is social diffusion of responsibility, not individual belief updating",
+      "Underspecified primitives: 'world-model' and 'belief' are used interchangeably but never formally distinguished; 'emotion' assignments feel arbitrary (why shame vs. mild-surprise?)",
+      "Unexplained response mode diversity: 'Conformity to restore predicted social harmony' appears disconnected from core error-minimization principle—reads like post-hoc explanation rather than natural consequence",
+      "Low explanatory power for decision-making biases: Anchoring, Framing, Choice Overload require attention-weighting and reference-dependence mechanisms not in the model",
+      "No account of individual differences: The model cannot explain why some people are introverts vs. extroverts, or why confirmation bias strength varies"
+    ],
+    "modelName": "The Prediction Engine",
+    "benchmarkCount": 18
+  }
+}
