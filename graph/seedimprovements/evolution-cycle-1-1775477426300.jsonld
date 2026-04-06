@@ -1,0 +1,14 @@
+{
+  "@context": "sevo://v1",
+  "@type": "SeedImprovement",
+  "@id": "evolution-cycle-1-1775477426300",
+  "timestamp": "2026-04-06T12:10:26.300Z",
+  "observation": "Cycle 1: 1 models, best=0.238, weakness: The model **has no relational/social layer** — it treats the person as a isolated prediction-error m",
+  "suggestion": "Focus on: The model **has no relational/social layer** — it treats the person as a isolated prediction-error minimizer, but humans are fundamentally social crea",
+  "evidence": [
+    "cycle:1",
+    "best-fitness:0.238",
+    "population:1"
+  ],
+  "priority": 5
+}
