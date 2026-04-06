@@ -1014,20 +1014,21 @@ function applyRegulatoryFocus(
   return { ...response, emotion, behavior, rootCause, process };
 }
 
-// ─── Cognitive Dissonance Detector (Festinger 1957) ──────────────────
-// When stimulus reveals a belief-behavior gap or belief-belief conflict,
-// compute dissonance D = Σ|b_i × b_j| × personalRelevance.
-// Three resolution strategies mirror attractor basin capture:
-//   rationalize  (c > 0.6): high commitment → justify prior behavior
-//   trivialize   (importance < 0.3): low stakes → downweight conflict
-//   update       (low c + high PE): revise belief toward new evidence
+// ─── Cognitive Dissonance Resolver (Festinger 1957) ──────────────────
+// Gate before emotion mapping: scan beliefs for semantic opposition to stimulus.
+// D = Σ_i (rel × imp_i × inc_i)  where inc_i ∈ [0,1] is semantic inconsistency.
+// If D > 0.4, intercept and route through least-resistance resolution:
+//   trivialize    (default): reduce belief importance → behavior='dismiss/minimize'
+//   rationalize   (N > 0.5): add consonant belief → behavior='explain away'
+//   attitude_change (O > 0.6): flip belief → behavior='update self-concept'
+// Choice: trait[openness] (high → attitude_change), trait[neuroticism] (high → rationalize)
 //
+// Explains: motivated reasoning, sunk cost, post-purchase rationalization, belief perseverance.
 // Source: Festinger, L. (1957). A theory of cognitive dissonance. Stanford UP.
-// Also covers: self-perception theory, post-decision regret, identity-protective cognition.
 
 interface DissonanceState {
   score: number;
-  strategy: "rationalize" | "trivialize" | "update" | "none";
+  strategy: "rationalize" | "trivialize" | "attitude_change" | "none";
   isActive: boolean;
 }
 
@@ -1038,37 +1039,78 @@ const DISSONANCE_CUES = [
   "justify", "rationalize", "post-decision", "dissonance",
 ];
 
+// Semantic opposition pairs: belief keyword vs stimulus keyword → conflict
+const BELIEF_STIMULUS_OPPOSITIONS: [string, string][] = [
+  ["competent", "fail"],    ["competent", "mistake"],  ["competent", "wrong"],
+  ["capable",   "fail"],    ["capable",   "mistake"],
+  ["smart",     "fail"],    ["smart",     "mistake"],  ["smart",     "wrong"],
+  ["successful","fail"],    ["successful","loss"],      ["successful","mistake"],
+  ["good person","harm"],   ["good person","hurt"],     ["good person","wrong"],
+  ["honest",    "lie"],     ["honest",    "deceiv"],    ["honest",    "cheat"],
+  ["moral",     "wrong"],   ["moral",     "harm"],      ["ethical",   "cheat"],
+  ["healthy",   "smoke"],   ["healthy",   "drink"],     ["healthy",   "unhealthy"],
+  ["strong",    "weak"],    ["strong",    "helpless"],
+  ["safe",      "danger"],  ["safe",      "threat"],
+  ["trustworthy","betray"], ["loyal",     "betray"],
+  ["loved",     "reject"],  ["loved",     "alone"],
+  ["kind",      "cruel"],   ["kind",      "harm"],
+  ["right",     "wrong"],   ["winner",    "lost"],
+];
+
+// Compute per-belief inconsistency score against stimulus description
+function beliefStimInconsistency(belief: string, stimDesc: string): number {
+  const bl = belief.toLowerCase();
+  const sd = stimDesc.toLowerCase();
+  let hits = 0;
+  for (const [bWord, sWord] of BELIEF_STIMULUS_OPPOSITIONS) {
+    if (bl.includes(bWord) && sd.includes(sWord)) hits++;
+  }
+  // Normalize: each pair match = 1 hit; cap at 1.0
+  return Math.min(1.0, hits * 0.5);
+}
+
 function computeDissonance(situation: Situation): DissonanceState {
   const { stimulus, person } = situation;
   const desc = `${stimulus.description} ${stimulus.type}`.toLowerCase();
 
-  const cueHits = DISSONANCE_CUES.filter(c => desc.includes(c)).length;
-  if (cueHits === 0 || stimulus.personalRelevance < 0.3) {
-    return { score: 0, strategy: "none", isActive: false };
+  // Belief-stimulus semantic opposition: D = Σ_i (rel × imp_i × inc_i)
+  let totalD = 0;
+  if (person.beliefs.length > 0) {
+    for (const belief of person.beliefs) {
+      const inc_i = beliefStimInconsistency(belief, desc);
+      if (inc_i > 0) {
+        // imp_i proxy: length-based (longer = more elaborated = more important)
+        const imp_i = Math.min(1.0, 0.4 + belief.length / 120);
+        totalD += stimulus.personalRelevance * imp_i * inc_i;
+      }
+    }
   }
 
-  // D = Σ_{i≠j} |b_i × b_j| × importance
-  // Beliefs are strings; use belief count × personal relevance as proxy magnitude
-  const beliefCount = person.beliefs.length;
-  const pairs = beliefCount > 1 ? (beliefCount * (beliefCount - 1)) / 2 : 1;
-  const score = Math.min(1.0, (cueHits / 5) * stimulus.personalRelevance * Math.min(pairs / 3, 1));
+  // Also accumulate from explicit dissonance cues in stimulus description
+  const cueHits = DISSONANCE_CUES.filter(c => desc.includes(c)).length;
+  if (cueHits > 0 && stimulus.personalRelevance >= 0.3) {
+    const beliefCount = person.beliefs.length;
+    const pairs = beliefCount > 1 ? (beliefCount * (beliefCount - 1)) / 2 : 1;
+    totalD += (cueHits / 5) * stimulus.personalRelevance * Math.min(pairs / 3, 1) * 0.5;
+  }
 
+  const score = Math.min(1.0, totalD);
   if (score < 0.1) return { score, strategy: "none", isActive: false };
 
-  // commitment c = history.length / 5, capped at 1.0
-  const commitment = Math.min(1.0, (person.history?.length ?? 0) / 5);
-  const importance = stimulus.personalRelevance;
+  // Strategy: openness (high → attitude_change), neuroticism (high → rationalize), else trivialize
+  const openness    = person.traits["openness"]    ?? 0.5;
+  const neuroticism = person.traits["neuroticism"] ?? 0.5;
 
   const strategy: DissonanceState["strategy"] =
-    commitment > 0.6 ? "rationalize" :
-    importance < 0.3 ? "trivialize"  :
-                       "update";
+    openness > 0.6    ? "attitude_change" :
+    neuroticism > 0.5 ? "rationalize"     :
+                        "trivialize";
 
   return { score, strategy, isActive: true };
 }
 
 // Apply dissonance resolution before domain templates run.
-// Rationalization and trivialization are identity-protective; belief-update is open.
+// Trivialization and rationalization are identity-protective; attitude_change is open.
 function applyDissonanceDetector(
   situation: Situation,
   response: Response,
@@ -1077,24 +1119,27 @@ function applyDissonanceDetector(
 ): Response {
   if (!ds.isActive) return response;
 
-  const commitment = Math.min(1.0, (situation.person.history?.length ?? 0) / 5);
+  const openness    = situation.person.traits["openness"]    ?? 0.5;
+  const neuroticism = situation.person.traits["neuroticism"] ?? 0.5;
   let { emotion, behavior, rootCause, process } = response;
 
   if (ds.strategy === "rationalize") {
-    behavior = "justify-prior-choice";
-    // Rationalization suppresses guilt/anxiety — person feels "right"
+    // High neuroticism: add consonant belief to explain away contradiction
+    behavior = "explain away";
     if (["guilty", "anxious", "embarrassed"].includes(emotion)) emotion = "content";
-    rootCause = `cognitive-dissonance(Festinger:D=${ds.score.toFixed(2)}) → rationalization(commitment=${commitment.toFixed(2)}) | ${rootCause}`;
-    process   = `dissonance:rationalization — high-commitment drives justification of prior behavior | ${process}`;
+    rootCause = `cognitive-dissonance(Festinger:D=${ds.score.toFixed(2)}) → rationalization(N=${neuroticism.toFixed(2)}) | ${rootCause}`;
+    process   = `dissonance:rationalization — high-neuroticism drives consonance-seeking to explain away conflict | ${process}`;
   } else if (ds.strategy === "trivialize") {
-    rootCause = `cognitive-dissonance(D=${ds.score.toFixed(2)}) → trivialization(low-importance) | ${rootCause}`;
-    process   = `dissonance:trivialization — low-importance reduces cognitive conflict | ${process}`;
+    // Default/low-stakes: downweight the belief-stimulus conflict
+    behavior = "dismiss/minimize";
+    rootCause = `cognitive-dissonance(D=${ds.score.toFixed(2)}) → trivialization(low-openness,low-neuroticism) | ${rootCause}`;
+    process   = `dissonance:trivialization — least-effort path reduces cognitive conflict via minimization | ${process}`;
   } else {
-    // update: low commitment + strong prediction error → revise belief
-    behavior = "update-belief";
+    // attitude_change: high openness → flip belief, update self-concept
+    behavior = "update self-concept";
     emotion  = "curious";
-    rootCause = `cognitive-dissonance(D=${ds.score.toFixed(2)}) → belief-change(commitment=${commitment.toFixed(2)},PE=${maxF.toFixed(2)}) | ${rootCause}`;
-    process   = `dissonance:belief-update — low-commitment enables new-evidence integration | ${process}`;
+    rootCause = `cognitive-dissonance(D=${ds.score.toFixed(2)}) → attitude-change(O=${openness.toFixed(2)},PE=${maxF.toFixed(2)}) | ${rootCause}`;
+    process   = `dissonance:attitude-change — high-openness enables belief revision toward new evidence | ${process}`;
   }
 
   return { ...response, emotion, behavior, rootCause, process };
@@ -1811,8 +1856,8 @@ export function predict(situation: Situation): Response {
   let regulated: Response;
   if (dissonanceVeto) {
     const resolutionBehavior =
-      dsState.strategy === "rationalize" ? "justify-prior-choice"
-      : dsState.strategy === "update"    ? "seek-resolution"
+      dsState.strategy === "rationalize"     ? "explain away"
+      : dsState.strategy === "attitude_change" ? "seek-resolution"
       : "contain-conflict";
     regulated = {
       ...narrativeAdjusted,
