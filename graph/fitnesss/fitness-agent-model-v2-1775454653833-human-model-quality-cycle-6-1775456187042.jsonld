@@ -1,0 +1,24 @@
+{
+  "@context": "sevo://v1",
+  "@type": "Fitness",
+  "@id": "fitness-agent-model-v2-1775454653833-human-model-quality-cycle-6-1775456187042",
+  "timestamp": "2026-04-06T06:17:21.105Z",
+  "agent": "agent:model-v2-1775454653833",
+  "eqs": 0.06531972647421809,
+  "accuracy": 0,
+  "magnitude": 0,
+  "branchesExplored": 1,
+  "predictionError": 1,
+  "cycleId": "human-model-quality-cycle-6-1775456187042",
+  "context": {
+    "fitness": 0.16329931618554522,
+    "accuracy": 1,
+    "coverage": 1,
+    "coherence": 0.4,
+    "primitiveCount": 6,
+    "strengths": [],
+    "weaknesses": [],
+    "modelName": "The Prediction Engine",
+    "benchmarkCount": 18
+  }
+}
