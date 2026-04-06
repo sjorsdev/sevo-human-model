@@ -189,7 +189,7 @@ function scoreBenchmark(response: Response, expected: ExpectedResponse): number 
 Output the COMPLETE TypeScript file in a code block. Make predict() genuinely different per situation.`;
 
   try {
-    const response = await callClaude(prompt, "sonnet");
+    const response = await callClaude(prompt, "haiku");
     const match = response.match(/```(?:typescript|ts)?\s*\n([\s\S]*?)```/);
     const code = match?.[1]?.trim();
     if (!code || !code.includes("predict") || !code.includes("evaluate")) return null;
