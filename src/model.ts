@@ -683,6 +683,136 @@ function applyDomainTemplate(domain: string, situation: Situation, response: Res
   return template ? template(situation, response) : response;
 }
 
+// ─── Causal Attribution Spine (Weiner 1985) ──────────────────────────
+// 3D attribution taxonomy: Locus × Stability × Controllability.
+// 8-cell cube maps deterministically to (emotion, rootCause).
+// Source: Weiner, B. (1985). An attributional theory of achievement motivation and emotion.
+//         Psychological Review, 92(4), 548–573.
+//
+// Axis inference from stimulus features:
+//   Locus:    internal if stimulus about self (failure, effort, ability, guilt)
+//             external if stimulus about environment/others (threat, rejection, luck)
+//   Stability: stable if chronic/trait features present; unstable if situational
+//   Control:   controllable if effort/choice present; uncontrollable if ability/luck
+
+interface AttributionVector {
+  locus: "internal" | "external";
+  stability: "stable" | "unstable";
+  control: "controllable" | "uncontrollable";
+}
+
+interface AttributionOutcome {
+  emotion: string;
+  rootCause: string;
+  behaviorHint?: string; // optional behavior nudge (not forced, let attractor decide)
+}
+
+const ATTRIBUTION_CUBE: Record<string, Record<string, Record<string, AttributionOutcome>>> = {
+  internal: {
+    stable: {
+      uncontrollable: { emotion: "shame",    rootCause: "attribution: internal+stable+uncontrollable → helpless self-blame (shame/depression)",    behaviorHint: "withdrawal" },
+      controllable:   { emotion: "guilt",    rootCause: "attribution: internal+stable+controllable → chronic self-criticism (guilt, perfectionism)", behaviorHint: "self-criticize" },
+    },
+    unstable: {
+      uncontrollable: { emotion: "embarrassed", rootCause: "attribution: internal+unstable+uncontrollable → transient self-blame (embarrassment)", behaviorHint: "hide" },
+      controllable:   { emotion: "guilty",   rootCause: "attribution: internal+unstable+controllable → regret + repair motivation (guilt)",         behaviorHint: "repair-behavior" },
+    },
+  },
+  external: {
+    stable: {
+      uncontrollable: { emotion: "hopeless",  rootCause: "attribution: external+stable+uncontrollable → learned helplessness (Seligman 1972)",      behaviorHint: "resignation" },
+      controllable:   { emotion: "angry",     rootCause: "attribution: external+stable+controllable → systemic injustice anger → protest",          behaviorHint: "protest" },
+    },
+    unstable: {
+      uncontrollable: { emotion: "sad",       rootCause: "attribution: external+unstable+uncontrollable → situational sadness/pity → accept",       behaviorHint: "seek-support" },
+      controllable:   { emotion: "angry",     rootCause: "attribution: external+unstable+controllable → other-blame anger → confront",               behaviorHint: "confront" },
+    },
+  },
+};
+
+function computeAttribution(situation: Situation): AttributionVector {
+  const { stimulus, person, context } = situation;
+  const desc = `${stimulus.description} ${stimulus.type} ${context.environment}`.toLowerCase();
+
+  // ── Locus ──────────────────────────────────────────────────────────
+  const INTERNAL_CUES = ["failure", "mistake", "fault", "effort", "ability", "skill",
+                          "stupid", "lazy", "weak", "incompetent", "guilt", "shame",
+                          "internal", "myself", "i failed", "my fault"];
+  const EXTERNAL_CUES = ["threat", "rejection", "loss", "luck", "unfair", "attack",
+                          "someone", "they", "system", "boss", "authority", "circumstance",
+                          "accident", "chance", "environment", "external"];
+
+  const internalScore = INTERNAL_CUES.filter(c => desc.includes(c)).length +
+    (stimulus.type.toLowerCase() === "internal" ? 2 : 0);
+  const externalScore = EXTERNAL_CUES.filter(c => desc.includes(c)).length +
+    (THREAT_STIMULI.has(stimulus.type.toLowerCase()) ? 1 : 0) +
+    (GAIN_STIMULI.has(stimulus.type.toLowerCase()) && stimulus.personalRelevance > 0.5 ? 0 : 1);
+
+  // Person's beliefs about locus (if captured in traits)
+  const externalLOC = person.traits["externalLOC"] ?? 0;  // 0 = internal, 1 = external
+  const locusScore = externalScore + externalLOC - internalScore;
+  const locus: "internal" | "external" = locusScore > 0 ? "external" : "internal";
+
+  // ── Stability ──────────────────────────────────────────────────────
+  const STABLE_CUES   = ["always", "never", "chronic", "trait", "personality", "ability",
+                          "inherent", "permanent", "typical", "pattern", "history"];
+  const UNSTABLE_CUES = ["today", "this time", "luck", "chance", "sometimes", "just now",
+                          "unusual", "temporary", "once", "mood", "tired", "recent"];
+
+  const stableScore   = STABLE_CUES.filter(c => desc.includes(c)).length +
+    (person.history && person.history.length >= 3 ? 2 : 0); // repeated history = stable
+  const unstableScore = UNSTABLE_CUES.filter(c => desc.includes(c)).length +
+    (stimulus.novelty > 0.6 ? 2 : 0); // novel stimulus = unstable
+
+  const stability: "stable" | "unstable" = stableScore > unstableScore ? "stable" : "unstable";
+
+  // ── Controllability ────────────────────────────────────────────────
+  const CONTROLLABLE_CUES   = ["choice", "effort", "decide", "try", "work", "strategy",
+                                 "practice", "deliberate", "intentional", "plan", "could have"];
+  const UNCONTROLLABLE_CUES = ["luck", "fate", "ability", "impossible", "no choice", "forced",
+                                "genetic", "disease", "accident", "out of control", "helpless"];
+
+  const controllableScore   = CONTROLLABLE_CUES.filter(c => desc.includes(c)).length +
+    (person.needs.some(n => ["autonomy", "control", "freedom"].includes(n.toLowerCase())) ? 1 : 0);
+  const uncontrollableScore = UNCONTROLLABLE_CUES.filter(c => desc.includes(c)).length +
+    (person.arousal > 0.75 ? 1 : 0); // high arousal reduces perceived control
+
+  const control: "controllable" | "uncontrollable" =
+    controllableScore > uncontrollableScore ? "controllable" : "uncontrollable";
+
+  return { locus, stability, control };
+}
+
+// Apply attribution spine: override emotion + refine rootCause when personalRelevance is high.
+// The free energy magnitude (maxF) scales intensity — low FE = weak attribution signal.
+function applyAttributionSpine(
+  situation: Situation,
+  response: Response,
+  maxF: number
+): Response {
+  // Only apply attribution when the situation personally matters
+  if (situation.stimulus.personalRelevance < 0.35) return response;
+
+  const attr = computeAttribution(situation);
+  const outcome = ATTRIBUTION_CUBE[attr.locus][attr.stability][attr.control];
+
+  // Intensity modifier: high FE = strong attribution signal, low FE = weak
+  const intensity = Math.min(1.0, 0.3 + maxF * 0.8);
+
+  // Only override emotion if FE signal strong enough and outcome emotion is specific
+  // (avoid overriding rich domain-template emotions with generic ones for weak signals)
+  const attributionEmotion = intensity > 0.45 ? outcome.emotion : response.emotion;
+
+  // Blend rootCause: attribution label prepended to existing domain rootCause
+  const attributionRootCause = `${outcome.rootCause} | ${response.rootCause}`;
+
+  return {
+    ...response,
+    emotion: attributionEmotion,
+    rootCause: attributionRootCause,
+  };
+}
+
 // Threshold above which an attractor basin overrides domain template behavior.
 // Models: habit formation, trauma lock-in, psychopathology rigidity.
 const ATTRACTOR_OVERRIDE_DEPTH = 3.0;
@@ -784,32 +914,37 @@ export function predict(situation: Situation): Response {
   // Apply domain templates; deep attractors re-assert behavior afterward
   const templated = applyDomainTemplate(domain, situation, baseResponse);
 
+  // ── Causal Attribution Spine (Weiner 1985) ─────────────────────────
+  // Refine emotion + rootCause using 3D attribution cube.
+  // FE magnitude (maxF) scales attribution signal strength.
+  const attributed = applyAttributionSpine(situation, templated, maxF);
+
   // ── Polyvagal SHUTDOWN override ───────────────────────────────────
   // Dorsal vagal collapse: no deep esteem/autonomy attractor can fire.
   // Behavior forced to freeze or withdrawal regardless of domain template.
   if (autonomicState === "SHUTDOWN") {
     const shutdownBehavior = arousal > 0.85 ? "freeze" : "withdrawal";
     return {
-      ...templated,
+      ...attributed,
       behavior: shutdownBehavior,
-      process: `${templated.process} | ${vagalTag}→${shutdownBehavior}`,
-      rootCause: `${templated.rootCause} [polyvagal:SHUTDOWN — dorsal-vagal collapse, safety-only processing]`,
+      process: `${attributed.process} | ${vagalTag}→${shutdownBehavior}`,
+      rootCause: `${attributed.rootCause} [polyvagal:SHUTDOWN — dorsal-vagal collapse, safety-only processing]`,
     };
   }
 
   if (depth >= ATTRACTOR_OVERRIDE_DEPTH) {
     // Pathological/habitual rigidity: template refines rootCause/process, attractor locks behavior
     return {
-      ...templated,
+      ...attributed,
       behavior: attractor.name,
-      process: `${templated.process} | ${attractorTag}[override]`,
-      rootCause: `${templated.rootCause} [rigid-basin:${attractor.name},depth=${depth.toFixed(1)}]`,
+      process: `${attributed.process} | ${attractorTag}[override]`,
+      rootCause: `${attributed.rootCause} [rigid-basin:${attractor.name},depth=${depth.toFixed(1)}]`,
     };
   }
 
   return {
-    ...templated,
-    process: `${templated.process} | ${attractorTag}`,
+    ...attributed,
+    process: `${attributed.process} | ${attractorTag}`,
   };
 }
 
