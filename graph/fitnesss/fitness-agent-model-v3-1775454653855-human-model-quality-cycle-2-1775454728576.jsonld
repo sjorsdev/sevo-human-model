@@ -1,0 +1,29 @@
+{
+  "@context": "sevo://v1",
+  "@type": "Fitness",
+  "@id": "fitness-agent-model-v3-1775454653855-human-model-quality-cycle-2-1775454728576",
+  "timestamp": "2026-04-06T05:52:08.694Z",
+  "agent": "agent:model-v3-1775454653855",
+  "eqs": 0.17888543819998318,
+  "accuracy": 0,
+  "magnitude": 0,
+  "branchesExplored": 1,
+  "predictionError": 1,
+  "cycleId": "human-model-quality-cycle-2-1775454728576",
+  "context": {
+    "fitness": 0.4472135954999579,
+    "accuracy": 1,
+    "coverage": 1,
+    "coherence": 1,
+    "primitiveCount": 5,
+    "compositeScore": 0.4472135954999579,
+    "strengths": [],
+    "weaknesses": [
+      "LLM judge unavailable — structural scoring only"
+    ],
+    "benchmarkCount": 18,
+    "passed": 18,
+    "modelName": "The Social Self",
+    "modelVersion": 3
+  }
+}
