@@ -1,0 +1,14 @@
+{
+  "@context": "sevo://v1",
+  "@type": "SeedImprovement",
+  "@id": "evolution-cycle-5-1775478365411",
+  "timestamp": "2026-04-06T12:26:05.411Z",
+  "observation": "Cycle 5: 1 models, best=0.238, weakness: The model **lacks explicit social-feedback mechanisms** — it models individual need-space inference ",
+  "suggestion": "Focus on: The model **lacks explicit social-feedback mechanisms** — it models individual need-space inference and autonomic gating but has no representation for",
+  "evidence": [
+    "cycle:5",
+    "best-fitness:0.238",
+    "population:1"
+  ],
+  "priority": 5
+}
