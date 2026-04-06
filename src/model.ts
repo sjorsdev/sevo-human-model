@@ -1800,6 +1800,11 @@ export function predict(situation: Situation): Response {
   const isDecisionDomain = domain === "decision";
   const decisionReferencePoint = isDecisionDomain ? inferReferencePoint(person) : 0;
 
+  // Per-need tracking for active inference signal (Friston 2010)
+  // peByNeed: raw prediction error per need; precisByNeed: scaled precision per need
+  const peByNeed: Record<string, number> = {};
+  const precisByNeed: Record<string, number> = {};
+
   for (const need of activeNeeds) {
     const key = normalizeNeed(need);
     // Domain prior takes precedence; fall back to base prior
@@ -1812,17 +1817,36 @@ export function predict(situation: Situation): Response {
     const scaledPrecision = prior.precision * traitMod * (0.5 + arousal) * vagalMod * precisionScale * alloFactor;
     // Prospect Theory value function for decision domain; standard |PE| otherwise.
     // v(Δ) amplifies losses 2.25× relative to equivalent gains, driving loss aversion.
-    const pe = isDecisionDomain
+    const needPE = isDecisionDomain
       ? Math.abs(prospectValue(obs - decisionReferencePoint))
       : Math.abs(obs - prior.expected);
-    const F = pe * pe * scaledPrecision;
+    const F = needPE * needPE * scaledPrecision;
+    peByNeed[need] = needPE;
+    precisByNeed[need] = scaledPrecision;
     if (F > maxF) { maxF = F; dominantNeed = need; }
   }
 
   const pe = Math.sqrt(maxF / Math.max((0.5 + arousal), 0.001));
   const isThreat = THREAT_STIMULI.has(stimulus.type.toLowerCase()) || obs < 0.3;
   const isGain   = GAIN_STIMULI.has(stimulus.type.toLowerCase())   || obs > 0.7;
-  const PE_THRESHOLD = 0.25;
+
+  // ── Per-Need Active Inference Mode (Friston 2010) ──────────────────────
+  // aiSignal = PE × precision for the dominant need.
+  // Active inference  (aiSignal > ACTION_THRESHOLD): act to change the world
+  //   so observations match predictions (fight/flee/seek/approach).
+  // Perceptual inference (≤ threshold): update beliefs to match observations.
+  //
+  // Unifies:
+  //   Anxiety    = high precision + high PE → compulsive acting to restore prediction
+  //   Curiosity  = low precision + novel PE → perceptual update / exploration
+  //   Trauma     = very high precision → priors resist update → chronic active mode
+  //   Conf. bias = high precision + low PE → assimilate without genuine belief update
+  const ACTION_THRESHOLD  = 1.0;
+  const dominantPE        = peByNeed[dominantNeed] ?? 0;
+  const dominantPrecision = precisByNeed[dominantNeed] ?? 1.0;
+  const aiSignalPerNeed   = dominantPE * dominantPrecision;
+  const inferenceMode: "act" | "perceive" =
+    aiSignalPerNeed > ACTION_THRESHOLD ? "act" : "perceive";
 
   // ── Lazarus/Smith Appraisal-to-Emotion (1990) ─────────────────────
   // Differentiated emotion via appraisal axes: congruence × coping × certainty.
@@ -1840,16 +1864,21 @@ export function predict(situation: Situation): Response {
     ? applyFocusEmotion(focusScalar, congruence, appraised, arousal)
     : appraised;
 
-  // Behavior: minimize free energy (initial pass — may be overridden by attractor)
+  // Behavior: F-minimization via active vs. perceptual inference.
+  // Active inference  → generate action to make observations match predictions.
+  // Perceptual inference → update internal beliefs to match observations.
+  // High-precision priors (trauma, rigid beliefs) resist perceptual update even at low PE,
+  // pushing toward active mode (confirmation bias, compulsive checking, hypervigilance).
   let behavior: string;
-  if (pe > PE_THRESHOLD) {
+  if (inferenceMode === "act") {
     if (isThreat && arousal > 0.7)      behavior = "flee";
     else if (isThreat && arousal > 0.4) behavior = "freeze";
     else if (isThreat)                  behavior = "appease";
     else if (isGain)                    behavior = "approach";
     else                                behavior = "seek-information";
   } else {
-    behavior = "continue";
+    // Perceptual inference: update beliefs. High precision resists updating (confirmation bias).
+    behavior = dominantPrecision > 4.0 ? "maintain-belief" : "update-belief";
   }
 
   // ── Narrative Agency × Communion (McAdams 1993) ──────────────────────
@@ -1877,8 +1906,8 @@ export function predict(situation: Situation): Response {
   const confidence = Math.min(0.9, 0.4 + pe * 1.2 + (depth >= ATTRACTOR_OVERRIDE_DEPTH ? 0.1 : 0));
 
   const baseResponse: Response = {
-    rootCause: `${dominantNeed} need [${domain}] — PE=${pe.toFixed(2)}, basin=${attractor.name}${depth >= ATTRACTOR_OVERRIDE_DEPTH ? " [locked]" : ""}`,
-    process: `active-inference+attractor: F=${maxF.toFixed(3)}, PE=${pe.toFixed(2)}, ${attractorTag}, ${vagalTag}, ${narrativeTag}, arousal=${arousal}${allostaticLoad > 0 ? `, alloLoad=${allostaticLoad.toFixed(2)}` : ""}`,
+    rootCause: `${dominantNeed} need [${domain}] — PE=${dominantPE.toFixed(2)}, π=${dominantPrecision.toFixed(1)}, ${inferenceMode}${depth >= ATTRACTOR_OVERRIDE_DEPTH ? " [locked]" : ""}`,
+    process: `F-minimize(${inferenceMode}): F=${maxF.toFixed(3)}, aiSignal=${aiSignalPerNeed.toFixed(2)}, ${attractorTag}, ${vagalTag}, ${narrativeTag}${allostaticLoad > 0 ? `, alloLoad=${allostaticLoad.toFixed(2)}` : ""}`,
     emotion,
     behavior,
     confidence,
