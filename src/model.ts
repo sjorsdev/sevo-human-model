@@ -1507,6 +1507,84 @@ interface CascadeState {
 const DISSONANCE_VETO_THRESHOLD  = 0.7;  // D above this suspends RFT
 const NARRATIVE_THREAT_THRESHOLD = 0.35; // alignment below this = identity threat
 
+// ─── Lazarus/Smith Appraisal-to-Emotion Mapper (1990) ────────────────
+// Differentiates emotions that share the same dominant need by crossing
+// three appraisal axes:
+//   (1) goal-congruence:   +1 = facilitated/gain, -1 = threatened/blocked
+//   (2) copingPotential:   can I act? (0 = helpless → 1 = fully capable)
+//   (3) certainty:         is the outcome definite (1) or probabilistic (0)?
+//
+// Key distinctions this enables (all previously collapsed to same need):
+//   safety + low-coping + certain-threat  → fear     (vs circumplex: both "anxious")
+//   safety + low-coping + uncertain-threat → anxiety
+//   esteem + low-coping + certain-loss    → shame     (vs circumplex: both "sad")
+//   esteem + low-coping + uncertain-loss  → guilt
+//   belonging + certain-loss             → grief      (vs circumplex: "sad")
+//   fairness + high-coping + blocked     → anger
+//
+// Math:
+//   copingPotential = conscientiousness × (1 − clamp(arousal−0.5, 0, 0.5)×2)
+//   certainty = 1 − stimulus.novelty
+//   SHUTDOWN → copingPotential forced to 0
+//
+// Source: Smith, C.A. & Lazarus, R.S. (1990). Emotion and adaptation.
+//         In L.A. Pervin (Ed.), Handbook of Personality (pp. 609–637). Guilford Press.
+
+function appraise(
+  dominantNeed: string,
+  congruence: number,       // +1 = goal-facilitated, -1 = goal-threatened, 0 = neutral
+  copingPotential: number,  // [0,1]
+  certainty: number         // [0,1]
+): string {
+  const need = normalizeNeed(dominantNeed);
+  const highCoping    = copingPotential >= 0.5;
+  const highCertainty = certainty >= 0.5;
+
+  // Goal-congruent: positive appraisal family
+  if (congruence > 0) {
+    if (need === "esteem" || need === "achievement") return highCoping ? "proud" : "hopeful";
+    if (need === "belonging") return "love";
+    if (need === "pleasure")  return "joy";
+    if (need === "safety")    return highCertainty ? "relieved" : "calm";
+    return highCoping ? "happy" : "content";
+  }
+
+  // Goal-incongruent: differentiated by need × coping × certainty
+  if (congruence < 0) {
+    switch (need) {
+      case "safety":
+        if (!highCoping && highCertainty)  return "fear";
+        if (!highCoping && !highCertainty) return "anxiety";
+        if (highCoping  && highCertainty)  return "anger";
+        return "vigilant";
+      case "esteem":
+        if (!highCoping && highCertainty)  return "shame";
+        if (!highCoping && !highCertainty) return "guilt";
+        return highCoping ? "anger" : "embarrassed";
+      case "belonging":
+        if (highCertainty) return "grief";
+        return highCoping ? "sad" : "loneliness";
+      case "fairness":
+        return highCoping ? "anger" : "resentment";
+      case "achievement":
+        if (!highCoping && highCertainty)  return "shame";
+        if (!highCoping && !highCertainty) return "anxiety";
+        return highCoping ? "frustrated" : "discouraged";
+      case "autonomy":
+        return highCoping ? "anger" : "helplessness";
+      case "understanding":
+        return highCoping ? "frustrated" : "confused";
+      case "pleasure":
+        return highCertainty ? "sad" : "disappointed";
+      default:
+        return !highCoping ? (highCertainty ? "fear" : "anxiety") : "angry";
+    }
+  }
+
+  // Neutral congruence
+  return highCoping ? "curious" : "uncertain";
+}
+
 export function predict(situation: Situation): Response {
   const { person, stimulus } = situation;
   const obs = stimulus.personalRelevance; // 0–1 observation
@@ -1567,20 +1645,16 @@ export function predict(situation: Situation): Response {
   const isGain   = GAIN_STIMULI.has(stimulus.type.toLowerCase())   || obs > 0.7;
   const PE_THRESHOLD = 0.25;
 
-  // Emotion — Russell (1980) Circumplex: valence × arousal → 3×3 grid
-  const valenceSign = isGain ? 1 : isThreat ? -1 : 0;
-  const valence = Math.tanh(valenceSign * pe * 2);
-
-  const arousalBin = arousal >= 0.67 ? "high" : arousal >= 0.33 ? "mid" : "low";
-  const valenceBin = valence >= 0.33 ? "pos" : valence <= -0.33 ? "neg" : "neutral";
-
-  const CIRCUMPLEX: Record<string, Record<string, string>> = {
-    high: { pos: "excited",  neutral: "alert",   neg: isThreat ? "terrified" : "angry" },
-    mid:  { pos: "happy",    neutral: "neutral",  neg: isThreat ? "anxious"   : "sad"  },
-    low:  { pos: "content",  neutral: "bored",    neg: "depressed" },
-  };
-
-  const emotion = CIRCUMPLEX[arousalBin][valenceBin];
+  // ── Lazarus/Smith Appraisal-to-Emotion (1990) ─────────────────────
+  // Differentiated emotion via appraisal axes: congruence × coping × certainty.
+  // Replaces Russell circumplex to distinguish fear/anxiety, shame/guilt, grief/sadness.
+  const congruence: number = isGain ? 1 : isThreat ? -1 : 0;
+  const conscientiousness = person.traits["conscientiousness"] ?? 0.5;
+  const copingPotential = autonomicState === "SHUTDOWN"
+    ? 0.0
+    : conscientiousness * (1 - Math.max(0, Math.min(0.5, arousal - 0.5)) * 2);
+  const certainty = 1 - stimulus.novelty;
+  const emotion = appraise(dominantNeed, congruence, copingPotential, certainty);
 
   // Behavior: minimize free energy (initial pass — may be overridden by attractor)
   let behavior: string;
