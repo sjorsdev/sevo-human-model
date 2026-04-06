@@ -1,0 +1,14 @@
+{
+  "@context": "sevo://v1",
+  "@type": "SeedImprovement",
+  "@id": "evolution-cycle-2-1775476472512",
+  "timestamp": "2026-04-06T11:54:32.512Z",
+  "observation": "Cycle 2: 1 models, best=0.238, weakness: The model has **no approach/appetitive system** — it only explains reactive threat-minimization (all",
+  "suggestion": "Focus on: The model has **no approach/appetitive system** — it only explains reactive threat-minimization (allostatic load, surprise-minimization, polyvagal gat",
+  "evidence": [
+    "cycle:2",
+    "best-fitness:0.238",
+    "population:1"
+  ],
+  "priority": 5
+}
