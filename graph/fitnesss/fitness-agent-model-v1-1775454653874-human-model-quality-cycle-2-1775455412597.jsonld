@@ -1,0 +1,40 @@
+{
+  "@context": "sevo://v1",
+  "@type": "Fitness",
+  "@id": "fitness-agent-model-v1-1775454653874-human-model-quality-cycle-2-1775455412597",
+  "timestamp": "2026-04-06T06:04:22.015Z",
+  "agent": "agent:model-v1-1775454653874",
+  "eqs": 0.014816207341961705,
+  "accuracy": 0,
+  "magnitude": 0,
+  "branchesExplored": 1,
+  "predictionError": 1,
+  "cycleId": "human-model-quality-cycle-2-1775455412597",
+  "context": {
+    "fitness": 0.03704051835490426,
+    "accuracy": 0.35,
+    "coverage": 0.4,
+    "coherence": 0.7,
+    "primitiveCount": 7,
+    "strengths": [
+      "Elegant three-drive framework (safety/belonging/competence) is intuitive and memorable",
+      "Correctly predicts anxious attachment, Asch conformity, emotional contagion, and fear response",
+      "Recognizes drive conflicts (framing effect, learned helplessness show competing motivations)",
+      "Highly compact: 7 primitives for broad scope is ambitious"
+    ],
+    "weaknesses": [
+      "Category errors: Frames cognitive biases (anchoring, framing, sunk cost) as drive responses when they're information-processing heuristics—fundamentally different mechanisms",
+      "Introversion mispredicted as belonging-drive seeking when it's about energy regulation (trait), not motivation",
+      "Milgram/bystander effect: Attributes to drives when core mechanisms are authority legitimacy, diffusion of responsibility, and social proof (not motivational)",
+      "Addiction/relapse: Treats as safety avoidance when it's cue-triggered habit + relief-seeking (learning/reward system), completely different domain",
+      "Grief: Frames as avoidance/freeze when primary mechanism is sadness, yearning, emotional processing—misses the emotional complexity",
+      "Loss aversion, choice overload, overjustification: Wrong drives entirely; these involve risk sensitivity, decision load, and self-perception, not motivation",
+      "No account for learning, expectancy, belief systems, attention, or cognitive processing—reductionist to drives only",
+      "Incoherent application: The same response pattern (freeze, seek connection) maps to unrelated phenomena, suggesting the theory doesn't actually explain distinct mechanisms",
+      "10/18 predictions fundamentally wrong; 4/18 partially correct; only 4/18 genuinely accurate",
+      "Misses that psychology requires multiple levels of analysis (evolutionary drives + cognitive biases + learned associations + emotional dynamics + social reasoning)"
+    ],
+    "modelName": "The Drive Machine",
+    "benchmarkCount": 18
+  }
+}
