@@ -720,31 +720,39 @@ interface AttributionOutcome {
 const ATTRIBUTION_CUBE: Record<string, Record<string, Record<string, AttributionOutcome>>> = {
   internal: {
     stable: {
-      uncontrollable: { emotion: "shame",    rootCause: "attribution: internal+stable+uncontrollable → helpless self-blame (shame/depression)",    behaviorHint: "withdrawal" },
-      controllable:   { emotion: "guilt",    rootCause: "attribution: internal+stable+controllable → chronic self-criticism (guilt, perfectionism)", behaviorHint: "self-criticize" },
+      uncontrollable: { emotion: "shame",        rootCause: "attribution: internal+stable+uncontrollable → helpless self-blame (shame/depression)",    behaviorHint: "withdrawal" },
+      controllable:   { emotion: "guilt",        rootCause: "attribution: internal+stable+controllable → chronic self-criticism (guilt, perfectionism)", behaviorHint: "self-criticize" },
     },
     unstable: {
-      uncontrollable: { emotion: "embarrassed", rootCause: "attribution: internal+unstable+uncontrollable → transient self-blame (embarrassment)", behaviorHint: "hide" },
-      controllable:   { emotion: "guilty",   rootCause: "attribution: internal+unstable+controllable → regret + repair motivation (guilt)",         behaviorHint: "repair-behavior" },
+      uncontrollable: { emotion: "embarrassed",  rootCause: "attribution: internal+unstable+uncontrollable → transient self-blame (embarrassment)", behaviorHint: "hide" },
+      controllable:   { emotion: "guilty",       rootCause: "attribution: internal+unstable+controllable → regret + adaptive coping (guilt→repair)", behaviorHint: "repair-behavior" },
     },
   },
   external: {
     stable: {
-      uncontrollable: { emotion: "hopeless",  rootCause: "attribution: external+stable+uncontrollable → learned helplessness (Seligman 1972)",      behaviorHint: "resignation" },
-      controllable:   { emotion: "angry",     rootCause: "attribution: external+stable+controllable → systemic injustice anger → protest",          behaviorHint: "protest" },
+      uncontrollable: { emotion: "helplessness", rootCause: "attribution: external+stable+uncontrollable → learned helplessness (Seligman 1972)",      behaviorHint: "resignation" },
+      controllable:   { emotion: "angry",        rootCause: "attribution: external+stable+controllable → systemic injustice anger → protest",          behaviorHint: "protest" },
     },
     unstable: {
-      uncontrollable: { emotion: "sad",       rootCause: "attribution: external+unstable+uncontrollable → situational sadness/pity → accept",       behaviorHint: "seek-support" },
-      controllable:   { emotion: "angry",     rootCause: "attribution: external+unstable+controllable → other-blame anger → confront",               behaviorHint: "confront" },
+      uncontrollable: { emotion: "surprise",     rootCause: "attribution: external+unstable+uncontrollable → situational surprise/luck → accept",      behaviorHint: "seek-support" },
+      controllable:   { emotion: "angry",        rootCause: "attribution: external+unstable+controllable → other-blame anger → confront",               behaviorHint: "confront" },
     },
   },
 };
 
-function computeAttribution(situation: Situation): AttributionVector {
+function computeAttribution(situation: Situation, dominantNeed: string): AttributionVector {
   const { stimulus, person, context } = situation;
   const desc = `${stimulus.description} ${stimulus.type} ${context.environment}`.toLowerCase();
 
-  // ── Locus ──────────────────────────────────────────────────────────
+  // ── Locus (Weiner 1985) ────────────────────────────────────────────
+  // Primary signal: sigmoid(personalRelevance × neuroticism − 0.5)
+  // When a personally-relevant situation activates a neurotic person, they default
+  // to internal attribution (self-blame). Keyword cues modulate this baseline.
+  const neuroticism = person.traits["neuroticism"] ?? 0.5;
+  const sigmoidInput = stimulus.personalRelevance * neuroticism - 0.5;
+  const sigmoidLocus = 1 / (1 + Math.exp(-sigmoidInput * 6)); // steep sigmoid
+  // > 0.5 = internal tendency; < 0.5 = external tendency
+
   const INTERNAL_CUES = ["failure", "mistake", "fault", "effort", "ability", "skill",
                           "stupid", "lazy", "weak", "incompetent", "guilt", "shame",
                           "internal", "myself", "i failed", "my fault"];
@@ -752,39 +760,52 @@ function computeAttribution(situation: Situation): AttributionVector {
                           "someone", "they", "system", "boss", "authority", "circumstance",
                           "accident", "chance", "environment", "external"];
 
-  const internalScore = INTERNAL_CUES.filter(c => desc.includes(c)).length +
+  const internalCueScore = INTERNAL_CUES.filter(c => desc.includes(c)).length +
     (stimulus.type.toLowerCase() === "internal" ? 2 : 0);
-  const externalScore = EXTERNAL_CUES.filter(c => desc.includes(c)).length +
-    (THREAT_STIMULI.has(stimulus.type.toLowerCase()) ? 1 : 0) +
-    (GAIN_STIMULI.has(stimulus.type.toLowerCase()) && stimulus.personalRelevance > 0.5 ? 0 : 1);
+  const externalCueScore = EXTERNAL_CUES.filter(c => desc.includes(c)).length +
+    (THREAT_STIMULI.has(stimulus.type.toLowerCase()) ? 1 : 0);
 
-  // Person's beliefs about locus (if captured in traits)
+  // Person's trait locus of control (if captured)
   const externalLOC = person.traits["externalLOC"] ?? 0;  // 0 = internal, 1 = external
-  const locusScore = externalScore + externalLOC - internalScore;
-  const locus: "internal" | "external" = locusScore > 0 ? "external" : "internal";
+  // Blend: sigmoid is primary (0.5 weight), keyword delta secondary (0.3), trait tertiary (0.2)
+  const keywordDelta = (internalCueScore - externalCueScore) / 5; // normalized
+  const combinedLocus = sigmoidLocus + keywordDelta * 0.3 - externalLOC * 0.2;
+  const locus: "internal" | "external" = combinedLocus > 0.5 ? "internal" : "external";
 
   // ── Stability ──────────────────────────────────────────────────────
+  // Stable if history shows repeated pattern (>= 2 occurrences) with same need/cause,
+  // or if descriptor contains chronic/trait cues.
   const STABLE_CUES   = ["always", "never", "chronic", "trait", "personality", "ability",
                           "inherent", "permanent", "typical", "pattern", "history"];
   const UNSTABLE_CUES = ["today", "this time", "luck", "chance", "sometimes", "just now",
                           "unusual", "temporary", "once", "mood", "tired", "recent"];
 
-  const stableScore   = STABLE_CUES.filter(c => desc.includes(c)).length +
-    (person.history && person.history.length >= 3 ? 2 : 0); // repeated history = stable
+  // History depth: >= 2 entries suggests a recurring pattern (not just one-off)
+  const historyLen = person.history?.length ?? 0;
+  const historyStable = historyLen >= 2 ? 2 : 0;
+
+  const stableScore   = STABLE_CUES.filter(c => desc.includes(c)).length + historyStable;
   const unstableScore = UNSTABLE_CUES.filter(c => desc.includes(c)).length +
     (stimulus.novelty > 0.6 ? 2 : 0); // novel stimulus = unstable
 
   const stability: "stable" | "unstable" = stableScore > unstableScore ? "stable" : "unstable";
 
   // ── Controllability ────────────────────────────────────────────────
+  // Primary signal: dominant need is achievement or autonomy → controllable.
+  // These needs presuppose agency; their frustration is attributed to controllable causes.
+  // Keyword cues provide supplementary signal.
+  const normDominant = normalizeNeed(dominantNeed);
+  const needImpliesControl = ["achievement", "autonomy"].includes(normDominant) ? 2 : 0;
+  const needImpliesNoControl = ["safety"].includes(normDominant) ? 1 : 0;
+
   const CONTROLLABLE_CUES   = ["choice", "effort", "decide", "try", "work", "strategy",
                                  "practice", "deliberate", "intentional", "plan", "could have"];
   const UNCONTROLLABLE_CUES = ["luck", "fate", "ability", "impossible", "no choice", "forced",
                                 "genetic", "disease", "accident", "out of control", "helpless"];
 
-  const controllableScore   = CONTROLLABLE_CUES.filter(c => desc.includes(c)).length +
-    (person.needs.some(n => ["autonomy", "control", "freedom"].includes(n.toLowerCase())) ? 1 : 0);
+  const controllableScore   = CONTROLLABLE_CUES.filter(c => desc.includes(c)).length + needImpliesControl;
   const uncontrollableScore = UNCONTROLLABLE_CUES.filter(c => desc.includes(c)).length +
+    needImpliesNoControl +
     (person.arousal > 0.75 ? 1 : 0); // high arousal reduces perceived control
 
   const control: "controllable" | "uncontrollable" =
@@ -798,12 +819,13 @@ function computeAttribution(situation: Situation): AttributionVector {
 function applyAttributionSpine(
   situation: Situation,
   response: Response,
-  maxF: number
+  maxF: number,
+  dominantNeed: string
 ): Response {
   // Only apply attribution when the situation personally matters
   if (situation.stimulus.personalRelevance < 0.35) return response;
 
-  const attr = computeAttribution(situation);
+  const attr = computeAttribution(situation, dominantNeed);
   const outcome = ATTRIBUTION_CUBE[attr.locus][attr.stability][attr.control];
 
   // Intensity modifier: high FE = strong attribution signal, low FE = weak
@@ -1382,7 +1404,7 @@ export function predict(situation: Situation): Response {
   const templated = applyDomainTemplate(domain, situation, dissonanced);
 
   // ── Causal Attribution Spine (Weiner 1985) ─────────────────────────
-  const attributed = applyAttributionSpine(situation, templated, maxF);
+  const attributed = applyAttributionSpine(situation, templated, maxF, dominantNeed);
 
   // ── Cascade Gate 3: Narrative Identity Threat (McAdams 1993) ───────
   // If dominant attractor misaligns with self-story (alignment < 0.35),
