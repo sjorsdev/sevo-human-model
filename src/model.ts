@@ -182,6 +182,149 @@ function inferDomain(situation: Situation): string {
 const THREAT_STIMULI = new Set(["threat", "loss", "rejection", "failure", "danger", "conflict", "criticism"]);
 const GAIN_STIMULI   = new Set(["reward", "success", "praise", "opportunity", "connection", "discovery", "achievement"]);
 
+// ─── Attractor Landscape Dynamics ────────────────────────────────────
+// Person = dynamical system; 3–5 stable attractor states per domain.
+// Stimulus applies a force vector; response = attractor basin that captures trajectory.
+// Basin depth = baseDepth × arousalMod × historyMod.
+// Deep attractors: trauma, pathology, habit. Shallow: healthy flexibility.
+// Math: X_final = X_person + F_stimulus; winner = argmin_i (|X_final − A_i|² / depth_i)
+// Deep basins (depth ≥ 3.0) override domain template behavior — explains why willpower fails.
+
+interface Attractor {
+  name: string;
+  pos: [number, number]; // [valence, arousal]  valence ∈ [-1,1], arousal ∈ [0,1]
+  baseDepth: number;     // 1.0 = normal; >3 = pathological/habitual
+}
+
+const DOMAIN_ATTRACTORS: Record<string, Attractor[]> = {
+  "cognitive-bias": [
+    { name: "heuristic-fast",   pos: [ 0.0,  0.3], baseDepth: 2.5 },
+    { name: "maintain-belief",  pos: [-0.1,  0.2], baseDepth: 2.0 },
+    { name: "update-belief",    pos: [ 0.4,  0.4], baseDepth: 0.8 },
+  ],
+  decision: [
+    { name: "risk-averse",   pos: [-0.2, 0.4], baseDepth: 2.5 },
+    { name: "risk-seeking",  pos: [ 0.3, 0.6], baseDepth: 1.5 },
+    { name: "deliberate",    pos: [ 0.1, 0.3], baseDepth: 1.2 },
+    { name: "satisfice",     pos: [ 0.0, 0.5], baseDepth: 1.8 },
+  ],
+  social: [
+    { name: "conform",   pos: [ 0.2, 0.4], baseDepth: 2.0 },
+    { name: "assert",    pos: [ 0.4, 0.6], baseDepth: 1.5 },
+    { name: "withdraw",  pos: [-0.4, 0.3], baseDepth: 1.8 },
+    { name: "compete",   pos: [ 0.1, 0.7], baseDepth: 1.2 },
+  ],
+  emotion: [
+    { name: "approach",   pos: [ 0.6, 0.5], baseDepth: 1.5 },
+    { name: "reappraise", pos: [ 0.2, 0.4], baseDepth: 1.2 },
+    { name: "avoid",      pos: [-0.3, 0.6], baseDepth: 2.0 },
+    { name: "freeze",     pos: [-0.1, 0.9], baseDepth: 1.8 },
+    { name: "suppress",   pos: [ 0.0, 0.2], baseDepth: 1.5 },
+  ],
+  motivation: [
+    { name: "pursue-goal",   pos: [ 0.5, 0.6], baseDepth: 2.0 },
+    { name: "seek-reward",   pos: [ 0.3, 0.5], baseDepth: 1.5 },
+    { name: "avoid-failure", pos: [-0.3, 0.5], baseDepth: 2.0 },
+    { name: "disengage",     pos: [-0.1, 0.2], baseDepth: 1.2 },
+  ],
+  development: [
+    { name: "explore",      pos: [ 0.5, 0.6], baseDepth: 1.5 },
+    { name: "attach",       pos: [ 0.2, 0.4], baseDepth: 2.5 },
+    { name: "regress",      pos: [-0.2, 0.7], baseDepth: 1.8 },
+    { name: "individuate",  pos: [ 0.4, 0.5], baseDepth: 1.2 },
+  ],
+  personality: [
+    { name: "approach-novel",  pos: [ 0.6, 0.5], baseDepth: 1.5 },
+    { name: "maintain-habit",  pos: [ 0.1, 0.3], baseDepth: 2.0 },
+    { name: "social-engage",   pos: [ 0.5, 0.7], baseDepth: 1.8 },
+    { name: "withdraw",        pos: [-0.2, 0.3], baseDepth: 1.5 },
+    { name: "ruminate",        pos: [-0.4, 0.5], baseDepth: 2.0 },
+  ],
+  psychopathology: [
+    { name: "avoidance",      pos: [-0.5, 0.7], baseDepth: 4.0 }, // anxiety — very deep
+    { name: "rumination",     pos: [-0.4, 0.3], baseDepth: 3.5 }, // depression
+    { name: "ritualize",      pos: [ 0.0, 0.6], baseDepth: 3.0 }, // OCD
+    { name: "hypervigilance", pos: [-0.3, 0.9], baseDepth: 4.5 }, // PTSD — deepest
+    { name: "withdraw",       pos: [-0.6, 0.2], baseDepth: 3.0 }, // depression withdrawal
+  ],
+};
+
+// Map emotional state string → (valence, arousal) position
+function emotionalStateToPos(emotionalState: string, arousal: number): [number, number] {
+  const s = emotionalState.toLowerCase();
+  const V: Record<string, number> = {
+    anxious: -0.6, fearful: -0.7, afraid: -0.7, scared: -0.7,
+    angry: -0.4, frustrated: -0.4, irritated: -0.3,
+    sad: -0.5, depressed: -0.7, hopeless: -0.8, despondent: -0.7,
+    happy: 0.7, joyful: 0.8, elated: 0.9,
+    content: 0.4, calm: 0.3, relaxed: 0.3,
+    excited: 0.7, energized: 0.5, eager: 0.6,
+    neutral: 0.0, okay: 0.1, curious: 0.4, interested: 0.3,
+    guilty: -0.4, ashamed: -0.5,
+  };
+  return [V[s] ?? 0.0, arousal];
+}
+
+// Compute stimulus force vector Δ(valence, arousal)
+function computeForce(situation: Situation): [number, number] {
+  const { stimulus } = situation;
+  const stype = stimulus.type.toLowerCase();
+  if (THREAT_STIMULI.has(stype)) {
+    return [
+      -stimulus.intensity * stimulus.personalRelevance * 0.6,
+       stimulus.intensity * 0.4,
+    ];
+  }
+  if (GAIN_STIMULI.has(stype)) {
+    return [
+       stimulus.intensity * stimulus.personalRelevance * 0.5,
+       stimulus.intensity * 0.2,
+    ];
+  }
+  return [
+    (stimulus.personalRelevance - 0.5) * stimulus.intensity * 0.4,
+     stimulus.novelty * stimulus.intensity * 0.3,
+  ];
+}
+
+// Select dominant attractor: winner = argmin_i (dist² / depth_i)
+// Deeper basins have larger effective capture radius.
+function selectAttractor(
+  domain: string,
+  personPos: [number, number],
+  force: [number, number],
+  person: Situation["person"]
+): { attractor: Attractor; depth: number } {
+  const attractors = DOMAIN_ATTRACTORS[domain] ?? DOMAIN_ATTRACTORS.emotion;
+
+  // X_final = current position + stimulus force, clamped to valid range
+  const xF: [number, number] = [
+    Math.max(-1, Math.min(1, personPos[0] + force[0])),
+    Math.max(0,  Math.min(1, personPos[1] + force[1])),
+  ];
+
+  // History deepens basins: repeated exposure = stronger habit/trauma
+  const historyLen = person.history?.length ?? 0;
+  const historyMod = 1 + Math.min(historyLen * 0.3, 2.0); // cap at 3×
+
+  // High arousal amplifies all attractor depths (emotional override)
+  const arousalMod = 0.5 + person.arousal;
+
+  let bestScore = Infinity;
+  let best = attractors[0];
+  let bestDepth = best.baseDepth * arousalMod * historyMod;
+
+  for (const a of attractors) {
+    const depth = a.baseDepth * arousalMod * historyMod;
+    const dx = xF[0] - a.pos[0];
+    const dy = xF[1] - a.pos[1];
+    const score = (dx * dx + dy * dy) / Math.max(depth, 0.001);
+    if (score < bestScore) { bestScore = score; best = a; bestDepth = depth; }
+  }
+
+  return { attractor: best, depth: bestDepth };
+}
+
 // ─── Domain-Specific Prediction Templates ────────────────────────────
 // Pre-structure output by domain before/after active inference.
 // Each template rewrites rootCause, process, and behavior to be concrete
@@ -483,6 +626,10 @@ function applyDomainTemplate(domain: string, situation: Situation, response: Res
   return template ? template(situation, response) : response;
 }
 
+// Threshold above which an attractor basin overrides domain template behavior.
+// Models: habit formation, trauma lock-in, psychopathology rigidity.
+const ATTRACTOR_OVERRIDE_DEPTH = 3.0;
+
 export function predict(situation: Situation): Response {
   const { person, stimulus } = situation;
   const obs = stimulus.personalRelevance; // 0–1 observation
@@ -515,24 +662,21 @@ export function predict(situation: Situation): Response {
   const PE_THRESHOLD = 0.25;
 
   // Emotion — Russell (1980) Circumplex: valence × arousal → 3×3 grid
-  // valence = tanh((gain ? +1 : -1) × pe × 2), clamped to [-1, 1]
   const valenceSign = isGain ? 1 : isThreat ? -1 : 0;
   const valence = Math.tanh(valenceSign * pe * 2);
 
-  // Bin arousal and valence into low/mid/high and neg/neutral/pos
   const arousalBin = arousal >= 0.67 ? "high" : arousal >= 0.33 ? "mid" : "low";
   const valenceBin = valence >= 0.33 ? "pos" : valence <= -0.33 ? "neg" : "neutral";
 
-  // Circumplex grid (Russell 1980): arousal × valence → emotion label
   const CIRCUMPLEX: Record<string, Record<string, string>> = {
-    high: { pos: "excited",   neutral: "alert",   neg: isThreat ? "terrified" : "angry" },
-    mid:  { pos: "happy",     neutral: "neutral",  neg: isThreat ? "anxious"   : "sad"  },
-    low:  { pos: "content",   neutral: "bored",    neg: "depressed" },
+    high: { pos: "excited",  neutral: "alert",   neg: isThreat ? "terrified" : "angry" },
+    mid:  { pos: "happy",    neutral: "neutral",  neg: isThreat ? "anxious"   : "sad"  },
+    low:  { pos: "content",  neutral: "bored",    neg: "depressed" },
   };
 
   const emotion = CIRCUMPLEX[arousalBin][valenceBin];
 
-  // Behavior: minimize free energy
+  // Behavior: minimize free energy (initial pass — may be overridden by attractor)
   let behavior: string;
   if (pe > PE_THRESHOLD) {
     if (isThreat && arousal > 0.7)      behavior = "flee";
@@ -544,17 +688,48 @@ export function predict(situation: Situation): Response {
     behavior = "continue";
   }
 
-  const confidence = Math.min(0.9, 0.4 + pe * 1.2);
+  // ── Attractor Landscape Dynamics ─────────────────────────────────────
+  // Model person as dynamical system; select attractor basin from trajectory.
+  // dX/dt = -∇V(X) + F_stimulus; V(X) = Σ depth_i·|X−A_i|²
+  // Deep basins (trauma, habit, pathology) override behavior regardless of stimulus.
+  const personPos = emotionalStateToPos(person.emotionalState, arousal);
+  const force = computeForce(situation);
+  const { attractor, depth } = selectAttractor(domain, personPos, force, person);
+
+  // Deep attractors override behavior — willpower insufficient against deep basin
+  if (depth >= ATTRACTOR_OVERRIDE_DEPTH) {
+    behavior = attractor.name;
+  }
+
+  const attractorTag = `attractor:${attractor.name}(depth=${depth.toFixed(1)})`;
+
+  const confidence = Math.min(0.9, 0.4 + pe * 1.2 + (depth >= ATTRACTOR_OVERRIDE_DEPTH ? 0.1 : 0));
 
   const baseResponse: Response = {
-    rootCause: `${dominantNeed} need [${domain}] — prediction error ${pe.toFixed(2)}`,
-    process: `active-inference: F=${maxF.toFixed(3)}, PE=${pe.toFixed(2)}, arousal=${arousal}, domain=${domain}`,
+    rootCause: `${dominantNeed} need [${domain}] — PE=${pe.toFixed(2)}, basin=${attractor.name}${depth >= ATTRACTOR_OVERRIDE_DEPTH ? " [locked]" : ""}`,
+    process: `active-inference+attractor: F=${maxF.toFixed(3)}, PE=${pe.toFixed(2)}, ${attractorTag}, arousal=${arousal}`,
     emotion,
     behavior,
     confidence,
   };
 
-  return applyDomainTemplate(domain, situation, baseResponse);
+  // Apply domain templates; deep attractors re-assert behavior afterward
+  const templated = applyDomainTemplate(domain, situation, baseResponse);
+
+  if (depth >= ATTRACTOR_OVERRIDE_DEPTH) {
+    // Pathological/habitual rigidity: template refines rootCause/process, attractor locks behavior
+    return {
+      ...templated,
+      behavior: attractor.name,
+      process: `${templated.process} | ${attractorTag}[override]`,
+      rootCause: `${templated.rootCause} [rigid-basin:${attractor.name},depth=${depth.toFixed(1)}]`,
+    };
+  }
+
+  return {
+    ...templated,
+    process: `${templated.process} | ${attractorTag}`,
+  };
 }
 
 // ─── Semantic Scoring ────────────────────────────────────────────────
