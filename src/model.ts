@@ -414,6 +414,18 @@ function computeForce(situation: Situation): [number, number] {
 // Deeper basins have larger effective capture radius.
 const ALLOSTATIC_LOAD_ATTRACTORS = new Set(["avoidance", "rumination", "hypervigilance"]);
 
+// ─── Directed History Modulation (Pavlov 1927; Foa & Kozak 1986) ─────
+// Gain keywords signal repeated safe/reward history → habituation
+// Threat keywords reuse ALLOSTATIC_THREAT_KEYWORDS (defined above)
+const HISTORY_GAIN_KEYWORDS = [
+  "reward", "success", "praise", "connection", "achievement",
+  "opportunity", "discovery", "win", "accomplish", "gain", "happy", "joy",
+];
+// Approach attractors: habituation reduces re-approach need after repeated gains
+const APPROACH_ATTRACTORS  = new Set(["approach", "explore", "seek-reward", "pursue-goal"]);
+// Avoidance attractors: sensitization deepens threat basins after repeated threat exposure
+const AVOIDANCE_ATTRACTORS = new Set(["avoidance", "rumination", "hypervigilance", "freeze"]);
+
 function selectAttractor(
   domain: string,
   personPos: [number, number],
@@ -431,19 +443,39 @@ function selectAttractor(
     Math.max(0,  Math.min(1, personPos[1] + force[1])),
   ];
 
-  // History deepens basins: repeated exposure = stronger habit/trauma
-  const historyLen = person.history?.length ?? 0;
-  const historyMod = 1 + Math.min(historyLen * 0.3, 2.0); // cap at 3×
+  // Directed History Modulation: Habituation vs. Sensitization
+  // Repeated gains → habituation (shallower approach basins)
+  // Repeated threats → sensitization (deeper avoidance basins)
+  // Source: Pavlov (1927); Foa & Kozak (1986) emotional processing theory
+  const history = person.history ?? [];
+  const historyLen = history.length;
+  const threatCount = history.filter(h => {
+    const hl = h.toLowerCase();
+    return ALLOSTATIC_THREAT_KEYWORDS.some(k => hl.includes(k));
+  }).length;
+  const gainCount = history.filter(h => {
+    const hl = h.toLowerCase();
+    return HISTORY_GAIN_KEYWORDS.some(k => hl.includes(k));
+  }).length;
+  const threatRatio = threatCount / Math.max(1, historyLen);
+  const gainRatio   = gainCount   / Math.max(1, historyLen);
 
   // High arousal amplifies all attractor depths (emotional override)
   const arousalMod = 0.5 + person.arousal;
 
   let bestScore = Infinity;
   let best = attractors[0];
-  let bestDepth = best.baseDepth * arousalMod * historyMod;
+  let bestDepth = best.baseDepth * arousalMod;
 
   for (const a of attractors) {
-    let depth = a.baseDepth * arousalMod * historyMod;
+    let depth = a.baseDepth * arousalMod;
+
+    // Directional history modulation: habituation vs. sensitization
+    if (APPROACH_ATTRACTORS.has(a.name)) {
+      depth *= Math.max(0.4, 1 - gainRatio * 0.4);   // habituation: gains reduce re-approach need
+    } else if (AVOIDANCE_ATTRACTORS.has(a.name)) {
+      depth *= (1 + threatRatio * 1.5);               // sensitization: threats deepen avoidance basins
+    }
 
     // Narrative alignment modulation (McAdams 1993)
     // Attractors matching the person's narrative schema are deeper (identity-reinforcing)
