@@ -1,0 +1,24 @@
+{
+  "@context": "sevo://v1",
+  "@type": "Fitness",
+  "@id": "fitness-agent-model-v1-1775454653874-human-model-quality-cycle-5-1775456078109",
+  "timestamp": "2026-04-06T06:16:26.980Z",
+  "agent": "agent:model-v1-1775454653874",
+  "eqs": 0.060474315681476355,
+  "accuracy": 0,
+  "magnitude": 0,
+  "branchesExplored": 1,
+  "predictionError": 1,
+  "cycleId": "human-model-quality-cycle-5-1775456078109",
+  "context": {
+    "fitness": 0.15118578920369088,
+    "accuracy": 1,
+    "coverage": 1,
+    "coherence": 0.4,
+    "primitiveCount": 7,
+    "strengths": [],
+    "weaknesses": [],
+    "modelName": "The Drive Machine",
+    "benchmarkCount": 18
+  }
+}
