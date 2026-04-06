@@ -813,6 +813,100 @@ function applyAttributionSpine(
   };
 }
 
+// ─── Regulatory Focus Theory (Higgins 1997) ──────────────────────────
+// 2-axis motivational spine: promotionFocus × preventionFocus.
+// regulatory_pressure = promotionFocus × gain_salience − preventionFocus × loss_salience
+// pressure > 0 → eagerness strategy: approach, creativity, optimism bias, joy/excitement
+// pressure < 0 → vigilance strategy: conservative, status-quo bias, anxiety/guilt
+//
+// promotionFocus inferred from extraversion + openness (BAS reward sensitivity + approach motivation)
+// preventionFocus inferred from neuroticism + conscientiousness (BIS threat sensitivity + duty orientation)
+//
+// Source: Higgins, E.T. (1997). Beyond pleasure and pain. American Psychologist, 52(12), 1280–1300.
+
+interface RegulatoryFocusState {
+  promotionFocus: number;   // 0–1 approach/gains orientation
+  preventionFocus: number;  // 0–1 avoid/loss orientation
+  gainSalience: number;     // 0–1 gain-frame strength
+  lossSalience: number;     // 0–1 loss-frame strength
+  pressure: number;         // signed: >0 = eagerness, <0 = vigilance
+  strategy: "eagerness" | "vigilance" | "neutral";
+}
+
+const RF_GAIN_CUES = ["reward", "success", "opportunity", "gain", "win", "achieve", "advance",
+                       "growth", "praise", "accomplish", "progress", "profit", "improve", "earn"];
+const RF_LOSS_CUES = ["threat", "failure", "loss", "criticism", "danger", "miss", "risk", "cost",
+                       "reject", "punish", "lose", "fail", "harm", "mistake", "wrong"];
+
+function computeRegulatoryFocus(situation: Situation): RegulatoryFocusState {
+  const { person, stimulus } = situation;
+  const t = (k: string) => person.traits[k] ?? 0.5;
+
+  // Infer focus axes from Big Five
+  const promotionFocus  = t("extraversion") * 0.5 + t("openness") * 0.5;
+  const preventionFocus = t("neuroticism")  * 0.5 + t("conscientiousness") * 0.5;
+
+  // Situational framing
+  const desc = `${stimulus.description} ${stimulus.type}`.toLowerCase();
+  const gainCount = RF_GAIN_CUES.filter(c => desc.includes(c)).length
+    + (GAIN_STIMULI.has(stimulus.type.toLowerCase()) ? 2 : 0);
+  const lossCount = RF_LOSS_CUES.filter(c => desc.includes(c)).length
+    + (THREAT_STIMULI.has(stimulus.type.toLowerCase()) ? 2 : 0);
+
+  const total = gainCount + lossCount + 1;
+  const relevanceMod = 0.5 + stimulus.personalRelevance * 0.5;
+  const gainSalience = (gainCount / total) * relevanceMod;
+  const lossSalience = (lossCount / total) * relevanceMod;
+
+  const pressure = promotionFocus * gainSalience - preventionFocus * lossSalience;
+  const strategy: RegulatoryFocusState["strategy"] =
+    pressure > 0.05 ? "eagerness" : pressure < -0.05 ? "vigilance" : "neutral";
+
+  return { promotionFocus, preventionFocus, gainSalience, lossSalience, pressure, strategy };
+}
+
+// Apply RFT filter after domain templates — adds motivational color without
+// overriding domain-specific content. Deep attractor overrides still take precedence.
+function applyRegulatoryFocus(
+  situation: Situation,
+  response: Response,
+  rf: RegulatoryFocusState
+): Response {
+  const abs = Math.abs(rf.pressure);
+  if (rf.strategy === "neutral" || abs < 0.05) return response;
+
+  const arousal = situation.person.arousal;
+  let { emotion, behavior, rootCause, process } = response;
+
+  if (rf.strategy === "eagerness") {
+    // Promotion system: eagerness, approach, optimism, risk-taking
+    // Signature emotions: excitement (high arousal) or cheerfulness (low arousal)
+    if (!["excited", "happy", "content", "elated", "joyful"].includes(emotion)) {
+      emotion = arousal > 0.55 ? "excited" : "cheerful";
+    }
+    // Shift avoidance/freeze behaviors toward approach when pressure is substantial
+    if (abs > 0.15 && ["freeze", "appease", "continue", "withdrawal", "avoidance"].includes(behavior)) {
+      behavior = "approach";
+    }
+    rootCause = `${rootCause} | RFT:promotion(pF=${rf.promotionFocus.toFixed(2)}) → eagerness`;
+    process   = `${process} | RFT:eagerness — gain-salience(${rf.gainSalience.toFixed(2)}) × promotionFocus`;
+  } else {
+    // Prevention system: vigilance, conservative, status-quo bias
+    // Signature emotions: anxiety/agitation (high arousal) or quiescence/guilt (low arousal)
+    if (!["anxious", "guilty", "afraid", "fearful", "terrified", "angry"].includes(emotion)) {
+      emotion = arousal > 0.55 ? "anxious" : "guilty";
+    }
+    // Shift approach behaviors toward status-quo when prevention pressure is high
+    if (abs > 0.15 && ["approach", "risk-seeking", "explore-novelty", "seek-connection"].includes(behavior)) {
+      behavior = "status-quo-maintenance";
+    }
+    rootCause = `${rootCause} | RFT:prevention(vF=${rf.preventionFocus.toFixed(2)}) → vigilance`;
+    process   = `${process} | RFT:vigilance — loss-salience(${rf.lossSalience.toFixed(2)}) × preventionFocus`;
+  }
+
+  return { ...response, emotion, behavior, rootCause, process };
+}
+
 // Threshold above which an attractor basin overrides domain template behavior.
 // Models: habit formation, trauma lock-in, psychopathology rigidity.
 const ATTRACTOR_OVERRIDE_DEPTH = 3.0;
@@ -919,32 +1013,39 @@ export function predict(situation: Situation): Response {
   // FE magnitude (maxF) scales attribution signal strength.
   const attributed = applyAttributionSpine(situation, templated, maxF);
 
+  // ── Regulatory Focus Theory Filter (Higgins 1997) ─────────────────
+  // 2-axis motivational spine: promotion × prevention focus modulates
+  // emotion valence and approach/avoidance behavior.
+  const rfState = computeRegulatoryFocus(situation);
+  const regulated = applyRegulatoryFocus(situation, attributed, rfState);
+  const rfTag = `RFT:${rfState.strategy}(p=${rfState.pressure.toFixed(2)})`;
+
   // ── Polyvagal SHUTDOWN override ───────────────────────────────────
   // Dorsal vagal collapse: no deep esteem/autonomy attractor can fire.
   // Behavior forced to freeze or withdrawal regardless of domain template.
   if (autonomicState === "SHUTDOWN") {
     const shutdownBehavior = arousal > 0.85 ? "freeze" : "withdrawal";
     return {
-      ...attributed,
+      ...regulated,
       behavior: shutdownBehavior,
-      process: `${attributed.process} | ${vagalTag}→${shutdownBehavior}`,
-      rootCause: `${attributed.rootCause} [polyvagal:SHUTDOWN — dorsal-vagal collapse, safety-only processing]`,
+      process: `${regulated.process} | ${vagalTag}→${shutdownBehavior}`,
+      rootCause: `${regulated.rootCause} [polyvagal:SHUTDOWN — dorsal-vagal collapse, safety-only processing]`,
     };
   }
 
   if (depth >= ATTRACTOR_OVERRIDE_DEPTH) {
     // Pathological/habitual rigidity: template refines rootCause/process, attractor locks behavior
     return {
-      ...attributed,
+      ...regulated,
       behavior: attractor.name,
-      process: `${attributed.process} | ${attractorTag}[override]`,
-      rootCause: `${attributed.rootCause} [rigid-basin:${attractor.name},depth=${depth.toFixed(1)}]`,
+      process: `${regulated.process} | ${attractorTag}[override]`,
+      rootCause: `${regulated.rootCause} [rigid-basin:${attractor.name},depth=${depth.toFixed(1)}]`,
     };
   }
 
   return {
-    ...attributed,
-    process: `${attributed.process} | ${attractorTag}`,
+    ...regulated,
+    process: `${regulated.process} | ${attractorTag} | ${rfTag}`,
   };
 }
 
