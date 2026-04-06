@@ -949,48 +949,136 @@ export function predict(situation: Situation): Response {
 }
 
 // ─── Semantic Scoring ────────────────────────────────────────────────
-// Score a single benchmark response against expected fields.
-// emotionMatch: +1 if response.emotion appears in emotionChange or vice versa
-// behaviorMatch: +1 if response.behavior overlaps with expected.behavior
-// mustIncludeHit: +1 if any mustInclude term found in combined output text
-// mustNotIncludePenalty: -1 if any mustNotInclude term found in combined output
-// Normalize by maxPossible (count of positive dimensions with criteria defined).
+// Weighted Jaccard similarity with synonym expansion.
+// Weights: rootCauseType × 2, behavior × 1.5, emotion × 1.
+// Synonym table enables domain-aware soft matching.
 
 import type { ExpectedResponse } from "./human-types.ts";
 
+const SYNONYMS: Record<string, string[]> = {
+  // Emotions
+  fear:          ["anxiety", "dread", "threat-response", "afraid", "scared", "fearful", "terrified", "anxious"],
+  anger:         ["frustration", "aggression", "hostility", "rage", "angry", "furious", "irritation", "irritated"],
+  sadness:       ["grief", "depression", "sorrow", "despair", "sad", "melancholy", "hopeless", "hopelessness"],
+  guilt:         ["shame", "regret", "remorse", "guilty"],
+  shame:         ["guilt", "embarrassment", "humiliation", "embarrassed"],
+  happiness:     ["joy", "pleasure", "elation", "content", "happy", "joyful", "elated"],
+  // Behaviors
+  avoidance:     ["withdrawal", "escape", "flee", "freeze", "avoid", "retreat"],
+  withdrawal:    ["avoidance", "escape", "withdraw", "isolation", "retreating"],
+  conformity:    ["comply", "conform", "obey", "agree", "submission", "compliance"],
+  // Root cause types
+  evolutionary:  ["survival", "instinct", "evolved", "adaptive", "fight-flight", "amygdala", "biological", "hardwired"],
+  learned:       ["conditioning", "reinforcement", "habit", "learning", "acquired", "behavioral", "classical", "operant"],
+  structural:    ["neural", "circuit", "cognitive", "schema", "system"],
+  cultural:      ["norm", "social", "cultural", "societal", "norms"],
+  developmental: ["stage", "childhood", "attachment", "piaget", "erikson", "growth"],
+};
+
+function expandWithSynonyms(term: string): string[] {
+  const t = term.toLowerCase();
+  const expanded = new Set([t]);
+  for (const [key, synList] of Object.entries(SYNONYMS)) {
+    if (t === key || synList.includes(t)) {
+      expanded.add(key);
+      for (const s of synList) expanded.add(s);
+    }
+  }
+  return [...expanded];
+}
+
+function extractKeywords(text: string): Set<string> {
+  return new Set(
+    text.toLowerCase().split(/[\s\-_|:,+\/\[\]().=]+/).filter((w) => w.length > 3)
+  );
+}
+
+function jaccardWithSynonyms(predicted: string, expected: string): number {
+  const predTokens = extractKeywords(predicted);
+  const expTokens  = extractKeywords(expected);
+  const predExpanded = new Set<string>();
+  const expExpanded  = new Set<string>();
+  for (const t of predTokens) for (const s of expandWithSynonyms(t)) predExpanded.add(s);
+  for (const t of expTokens)  for (const s of expandWithSynonyms(t)) expExpanded.add(s);
+  const intersection = [...predExpanded].filter((t) => expExpanded.has(t)).length;
+  const union = new Set([...predExpanded, ...expExpanded]).size;
+  if (union === 0) return 0;
+  return intersection / union;
+}
+
+// Infer rootCauseType from combined response text
+function inferRootCauseType(combined: string): string {
+  const types: Record<string, string[]> = {
+    evolutionary:  ["survival", "evolutionary", "evolved", "instinct", "amygdala", "fight-flight", "hardwired", "biological"],
+    learned:       ["conditioning", "learned", "reinforcement", "habit", "acquired"],
+    structural:    ["neural", "circuit", "cognitive", "schema", "system"],
+    cultural:      ["cultural", "norm", "social", "societal"],
+    developmental: ["developmental", "attachment", "piaget", "erikson", "stage"],
+  };
+  let best = "structural";
+  let bestScore = 0;
+  for (const [type, keywords] of Object.entries(types)) {
+    const hits = keywords.filter((k) => combined.includes(k)).length;
+    if (hits > bestScore) { bestScore = hits; best = type; }
+  }
+  return best;
+}
+
 function scoreBenchmark(response: Response, expected: ExpectedResponse): number {
   const combined = `${response.emotion} ${response.behavior} ${response.rootCause} ${response.process}`.toLowerCase();
-  let score = 0;
-  let maxScore = 0;
 
-  if (expected.emotionChange !== undefined) {
-    maxScore += 1;
-    const exp = expected.emotionChange.toLowerCase();
-    const got = response.emotion.toLowerCase();
-    if (exp.includes(got) || got.includes(exp) || combined.includes(exp)) score += 1;
+  let totalWeight = 0;
+  let weightedScore = 0;
+
+  // rootCauseType — weight 2.0
+  if (expected.rootCauseType !== undefined) {
+    const weight = 2.0;
+    totalWeight += weight;
+    const expType = expected.rootCauseType.toLowerCase();
+    const gotType = inferRootCauseType(combined);
+    const j = jaccardWithSynonyms(gotType, expType);
+    const typeScore = combined.includes(expType) ? 1.0 : j > 0.15 ? Math.min(1, j * 2) : 0;
+    weightedScore += weight * typeScore;
   }
 
+  // behavior — weight 1.5
   if (expected.behavior !== undefined) {
-    maxScore += 1;
-    const expB = expected.behavior.toLowerCase();
-    const gotB = response.behavior.toLowerCase();
-    // token overlap: any word >3 chars from expected appears in response behavior, or vice versa
-    const expTokens = expB.split(/\W+/).filter((w) => w.length > 3);
-    if (gotB.split(/\W+/).some((w) => w.length > 3 && expB.includes(w)) ||
-        expTokens.some((w) => gotB.includes(w))) score += 1;
+    const weight = 1.5;
+    totalWeight += weight;
+    const j = jaccardWithSynonyms(response.behavior, expected.behavior);
+    const expBehTokens = extractKeywords(expected.behavior);
+    const anyHit = [...expBehTokens].some((w) => combined.includes(w));
+    const behScore = Math.min(1, j * 4 + (anyHit ? 0.3 : 0));
+    weightedScore += weight * behScore;
   }
 
+  // emotion — weight 1.0
+  if (expected.emotionChange !== undefined) {
+    const weight = 1.0;
+    totalWeight += weight;
+    const j = jaccardWithSynonyms(response.emotion, expected.emotionChange);
+    const expEmo = expected.emotionChange.toLowerCase();
+    const emoScore = combined.includes(expEmo) ? 1.0 : j > 0.2 ? 1.0 : j * 3;
+    weightedScore += weight * Math.min(1, emoScore);
+  }
+
+  // mustInclude — weight 0.5
   if (expected.mustInclude && expected.mustInclude.length > 0) {
-    maxScore += 1;
-    if (expected.mustInclude.some((term) => combined.includes(term.toLowerCase()))) score += 1;
+    const weight = 0.5;
+    totalWeight += weight;
+    const hits = expected.mustInclude.filter((t) => combined.includes(t.toLowerCase())).length;
+    weightedScore += weight * (hits / expected.mustInclude.length);
   }
 
-  if (expected.mustNotInclude && expected.mustNotInclude.length > 0) {
-    if (expected.mustNotInclude.some((term) => combined.includes(term.toLowerCase()))) score -= 1;
+  // mustNotInclude — penalty −0.5 per violation
+  if (expected.mustNotInclude) {
+    for (const t of expected.mustNotInclude) {
+      if (combined.includes(t.toLowerCase())) weightedScore -= 0.5;
+    }
   }
 
-  if (maxScore === 0) return 0.5; // no scoreable criteria → neutral
-  return Math.max(0, score) / maxScore;
+  if (totalWeight === 0) return 0.5;
+  return Math.max(0, Math.min(1, weightedScore / totalWeight));
 }
 
 // ─── Evaluation: run model against all benchmarks ────────────────────
