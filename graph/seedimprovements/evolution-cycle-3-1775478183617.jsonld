@@ -1,0 +1,14 @@
+{
+  "@context": "sevo://v1",
+  "@type": "SeedImprovement",
+  "@id": "evolution-cycle-3-1775478183617",
+  "timestamp": "2026-04-06T12:23:03.617Z",
+  "observation": "Cycle 3: 1 models, best=0.238, weakness: The model conflates **arousal/stress state with emotion type** — it models threat activation (allost",
+  "suggestion": "Focus on: The model conflates **arousal/stress state with emotion type** — it models threat activation (allostatic load, autonomic gating) but has no mechanism ",
+  "evidence": [
+    "cycle:3",
+    "best-fitness:0.238",
+    "population:1"
+  ],
+  "priority": 5
+}
