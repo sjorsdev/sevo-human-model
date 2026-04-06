@@ -182,6 +182,307 @@ function inferDomain(situation: Situation): string {
 const THREAT_STIMULI = new Set(["threat", "loss", "rejection", "failure", "danger", "conflict", "criticism"]);
 const GAIN_STIMULI   = new Set(["reward", "success", "praise", "opportunity", "connection", "discovery", "achievement"]);
 
+// ─── Domain-Specific Prediction Templates ────────────────────────────
+// Pre-structure output by domain before/after active inference.
+// Each template rewrites rootCause, process, and behavior to be concrete
+// and domain-specific, enabling semantic matching to score accurately.
+
+type DomainTemplate = (situation: Situation, response: Response) => Response;
+
+function cognitiveBiasTemplate(situation: Situation, response: Response): Response {
+  const desc = `${situation.stimulus.description} ${situation.stimulus.type}`.toLowerCase();
+  const openness = situation.person.traits["openness"] ?? 0.5;
+
+  let bias = "heuristic-processing";
+  let mechanism = "mental shortcut applied to reduce cognitive load";
+  let biasBehavior = "maintain-existing-belief";
+
+  if (desc.includes("anchor") || desc.includes("first") || desc.includes("initial")) {
+    bias = "anchoring"; mechanism = "initial value anchors estimates; insufficient adjustment"; biasBehavior = "anchor-and-adjust";
+  } else if (desc.includes("confirm") || desc.includes("belief") || desc.includes("agree")) {
+    bias = "confirmation-bias"; mechanism = "seek/interpret info to confirm pre-existing belief"; biasBehavior = "seek-confirming-evidence";
+  } else if (desc.includes("recent") || desc.includes("remember") || desc.includes("vivid") || desc.includes("news")) {
+    bias = "availability-heuristic"; mechanism = "frequency judged by ease of recall; vivid events overweighted"; biasBehavior = "overweight-salient-examples";
+  } else if (desc.includes("frame") || desc.includes("saving") || (desc.includes("loss") && desc.includes("gain"))) {
+    bias = "framing-effect"; mechanism = "choice architecture shifts reference point; loss frame triggers risk-seeking"; biasBehavior = "frame-dependent-choice";
+  } else if (desc.includes("sunk") || desc.includes("invested") || desc.includes("already")) {
+    bias = "sunk-cost"; mechanism = "past irrecoverable costs influence future decisions"; biasBehavior = "continue-to-avoid-loss";
+  } else if (desc.includes("everyone") || desc.includes("popular") || desc.includes("most people")) {
+    bias = "bandwagon"; mechanism = "social proof heuristic; conformity to perceived majority"; biasBehavior = "conform-to-majority";
+  } else if (desc.includes("hindsight") || desc.includes("knew") || desc.includes("obvious")) {
+    bias = "hindsight-bias"; mechanism = "post-hoc belief that outcome was predictable; narrative reconstruction"; biasBehavior = "I-knew-it-all-along";
+  } else if (desc.includes("overconfid") || desc.includes("expert") || desc.includes("better than")) {
+    bias = "overconfidence"; mechanism = "confidence exceeds calibrated accuracy; unknown unknowns underweighted"; biasBehavior = "overestimate-own-ability";
+  }
+
+  const strengthMod = openness > 0.7 ? "attenuated" : openness < 0.3 ? "amplified" : "typical";
+  return {
+    ...response,
+    rootCause: `${bias} — System 1 heuristic overrides deliberate reasoning`,
+    process: `cognitive-bias: ${mechanism} [${strengthMod} by openness=${openness.toFixed(2)}]`,
+    behavior: biasBehavior,
+  };
+}
+
+function emotionTemplate(situation: Situation, response: Response): Response {
+  const { person, stimulus } = situation;
+  const arousal = person.arousal;
+  const emotionalState = (person.emotionalState ?? "neutral").toLowerCase();
+  const neuroticism = person.traits["neuroticism"] ?? 0.5;
+
+  let regulation: string;
+  if (arousal > 0.7 && neuroticism > 0.6) regulation = "rumination";
+  else if (arousal > 0.7) regulation = "reappraisal";
+  else if (neuroticism > 0.7) regulation = "suppression";
+  else regulation = "acceptance";
+
+  return {
+    ...response,
+    rootCause: `affective response to ${stimulus.type}: circumplex → ${response.emotion} [regulation:${regulation}]`,
+    process: `${response.process} → regulation:${regulation} [baseline:${emotionalState}]`,
+  };
+}
+
+function socialTemplate(situation: Situation, response: Response): Response {
+  const { person, stimulus, context } = situation;
+  const desc = `${stimulus.description} ${stimulus.type} ${context.socialSetting}`.toLowerCase();
+  const agreeableness = person.traits["agreeableness"] ?? 0.5;
+
+  let mechanism = "social-influence";
+  let socialBehavior = response.behavior;
+  let rootCause = response.rootCause;
+
+  if (desc.includes("norm") || desc.includes("rule") || desc.includes("violat") || desc.includes("unfair")) {
+    mechanism = "norm-violation-detection";
+    socialBehavior = "enforce-norm";
+    rootCause = `social norm violation → fairness/belonging need activated`;
+  } else if (desc.includes("conform") || desc.includes("pressure") || desc.includes("group")) {
+    mechanism = "conformity-pressure";
+    socialBehavior = agreeableness > 0.6 ? "conform" : "resist-pressure";
+    rootCause = `conformity pressure — agreeableness=${agreeableness.toFixed(2)} → ${socialBehavior}`;
+  } else if (desc.includes("authority") || desc.includes("order") || desc.includes("obey") || desc.includes("command")) {
+    mechanism = "authority-compliance";
+    socialBehavior = "comply-with-authority";
+    rootCause = `authority cue triggers compliance (Milgram effect, p=0.65)`;
+  } else if (desc.includes("comparison") || desc.includes("status") || desc.includes("better than") || desc.includes("worse")) {
+    mechanism = "social-comparison";
+    socialBehavior = stimulus.personalRelevance > 0.5 ? "self-enhance" : "self-protect";
+    rootCause = `social comparison (Festinger 1954) — esteem need → ${socialBehavior}`;
+  } else if (desc.includes("help") || desc.includes("bystander") || desc.includes("assist")) {
+    mechanism = "bystander-effect";
+    socialBehavior = agreeableness > 0.5 ? "help" : "diffuse-responsibility";
+    rootCause = `bystander situation — agreeableness=${agreeableness.toFixed(2)} → ${socialBehavior}`;
+  }
+
+  return {
+    ...response,
+    rootCause,
+    process: `social: ${mechanism} — ${context.socialSetting}`,
+    behavior: socialBehavior,
+  };
+}
+
+function decisionTemplate(situation: Situation, response: Response): Response {
+  const { stimulus, person, context } = situation;
+  const desc = stimulus.description.toLowerCase();
+
+  const isLossFrame = desc.includes("lose") || desc.includes("loss") || desc.includes("cost") ||
+                      desc.includes("risk") || desc.includes("miss") || stimulus.personalRelevance < 0.4;
+  const isGainFrame = desc.includes("gain") || desc.includes("win") || desc.includes("profit") ||
+                      desc.includes("save") || desc.includes("earn") || stimulus.personalRelevance > 0.6;
+
+  let decisionBehavior: string;
+  let ptProcess: string;
+
+  if (isLossFrame && !isGainFrame) {
+    decisionBehavior = "risk-seeking";
+    ptProcess = "prospect-theory: loss-frame → risk-seeking (λ=2.25, reference-point shift)";
+  } else if (isGainFrame && !isLossFrame) {
+    decisionBehavior = "risk-averse";
+    ptProcess = "prospect-theory: gain-frame → risk-aversion (diminishing marginal utility)";
+  } else {
+    decisionBehavior = "deliberate";
+    ptProcess = "prospect-theory: ambiguous frame → deliberation under uncertainty";
+  }
+
+  if (context.timeConstraint) {
+    ptProcess += ` + present-bias (β=0.70): time pressure amplifies immediate-option preference`;
+    decisionBehavior = isLossFrame ? "panic-choose" : "satisfice";
+  }
+
+  const conscientiousness = person.traits["conscientiousness"] ?? 0.5;
+  return {
+    ...response,
+    rootCause: `decision-under-uncertainty: ${isLossFrame && !isGainFrame ? "loss-aversion dominates" : isGainFrame ? "certainty-effect dominates" : "reference-point ambiguous"} [conscientiousness=${conscientiousness.toFixed(2)}]`,
+    process: ptProcess,
+    behavior: decisionBehavior,
+  };
+}
+
+function developmentTemplate(situation: Situation, response: Response): Response {
+  const { person, stimulus, context } = situation;
+  const desc = `${stimulus.description} ${context.environment}`.toLowerCase();
+
+  let stage = "adult";
+  let stageProcess = "Erikson:generativity-vs-stagnation — meaning and contribution drives";
+  let stageBehavior = response.behavior;
+
+  if (desc.includes("infant") || desc.includes("toddler") || desc.includes("preschool")) {
+    stage = "early-childhood";
+    stageProcess = "Piaget:preoperational — egocentrism, magical thinking; Erikson:initiative-vs-guilt";
+    stageBehavior = "imitate-caregiver";
+  } else if (desc.includes("attach") || desc.includes("caregiver") || desc.includes("parent") || desc.includes("separation")) {
+    stage = "attachment";
+    stageProcess = "Bowlby:attachment-theory — secure/anxious/avoidant pattern activation";
+    stageBehavior = person.needs.includes("safety") ? "proximity-seeking" : "independence-assertion";
+  } else if (desc.includes("school") || desc.includes("grade") || desc.includes("peer") || desc.includes("child")) {
+    stage = "middle-childhood";
+    stageProcess = "Piaget:concrete-operational + Erikson:industry-vs-inferiority";
+    stageBehavior = "seek-peer-validation";
+  } else if (desc.includes("teen") || desc.includes("adolesc") || desc.includes("identity") || desc.includes("puberty")) {
+    stage = "adolescence";
+    stageProcess = "Erikson:identity-vs-role-confusion — individuation and peer-group anchoring";
+    stageBehavior = "identity-exploration";
+  }
+
+  return {
+    ...response,
+    rootCause: `developmental [${stage}]: ${response.rootCause}`,
+    process: `development: ${stageProcess}`,
+    behavior: stageBehavior,
+  };
+}
+
+function personalityTemplate(situation: Situation, response: Response): Response {
+  const { person, stimulus } = situation;
+  const traits = person.traits;
+  const bigFive = ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"];
+
+  let dominantTrait = "neuroticism";
+  let maxDeviation = 0;
+  for (const t of bigFive) {
+    const dev = Math.abs((traits[t] ?? 0.5) - 0.5);
+    if (dev > maxDeviation) { maxDeviation = dev; dominantTrait = t; }
+  }
+  const val = traits[dominantTrait] ?? 0.5;
+  const high = val > 0.5;
+
+  const patterns: Record<string, { hi: string; lo: string; hiP: string; loP: string }> = {
+    openness:          { hi: "explore-novelty",        lo: "prefer-familiar",       hiP: "intellectual curiosity drives approach",     loP: "conventional preference → avoidance" },
+    conscientiousness: { hi: "plan-and-execute",        lo: "impulsive-response",    hiP: "goal-directed self-regulation",             loP: "low delay-of-gratification" },
+    extraversion:      { hi: "social-engagement",       lo: "withdraw",              hiP: "social reward-seeking",                    loP: "solitude preference" },
+    agreeableness:     { hi: "cooperate",               lo: "compete",               hiP: "prosocial orientation",                    loP: "self-interest prioritized" },
+    neuroticism:       { hi: "ruminate",                lo: "cope-adaptively",       hiP: "negative affect amplification",            loP: "emotional stability" },
+  };
+  const p = patterns[dominantTrait];
+
+  return {
+    ...response,
+    rootCause: `personality: ${dominantTrait}=${val.toFixed(2)} shapes response to ${stimulus.type}`,
+    process: `personality: Big5/${dominantTrait}=${val.toFixed(2)} — ${high ? p.hiP : p.loP}`,
+    behavior: high ? p.hi : p.lo,
+  };
+}
+
+function psychopathologyTemplate(situation: Situation, response: Response): Response {
+  const { person, stimulus } = situation;
+  const desc = `${stimulus.description} ${stimulus.type}`.toLowerCase();
+  const emotionalState = (person.emotionalState ?? "").toLowerCase();
+  const arousal = person.arousal;
+
+  let cluster = "general-distress";
+  let clusterProcess = "general distress → emotion dysregulation → maladaptive coping";
+  let clusterBehavior = "seek-reassurance";
+
+  if (emotionalState.includes("anxious") || emotionalState.includes("fear") ||
+      (arousal > 0.75 && (desc.includes("threat") || desc.includes("danger")))) {
+    cluster = "anxiety-spectrum";
+    clusterProcess = "amygdala hyperactivation → anticipatory-fear generalization → avoidance-reinforcement cycle";
+    clusterBehavior = "avoidance";
+  } else if (emotionalState.includes("sad") || emotionalState.includes("depress") || emotionalState.includes("hopeless") ||
+             (arousal < 0.3 && stimulus.intensity > 0.6)) {
+    cluster = "depressive-spectrum";
+    clusterProcess = "negative cognitive triad (self/world/future) + anhedonia → motivational deficit";
+    clusterBehavior = "withdrawal";
+  } else if (desc.includes("intrusive") || desc.includes("compuls") || desc.includes("repeat") || desc.includes("ritual")) {
+    cluster = "OCD-spectrum";
+    clusterProcess = "intrusive thought → distress → compulsive neutralizing → temporary relief → reinforcement";
+    clusterBehavior = "ritualize";
+  } else if (arousal > 0.8 && (desc.includes("trauma") || desc.includes("flashback") ||
+             (person.history ?? []).some(h => h.toLowerCase().includes("trauma")))) {
+    cluster = "trauma-PTSD";
+    clusterProcess = "trauma-memory activation → hyperarousal → re-experiencing → avoidance/numbing";
+    clusterBehavior = "hypervigilant-avoidance";
+  } else if (desc.includes("social") || desc.includes("judg") || desc.includes("embarrass") || desc.includes("evaluat")) {
+    cluster = "social-anxiety";
+    clusterProcess = "social-evaluative threat → anticipatory shame → performance inhibition";
+    clusterBehavior = "social-avoidance";
+  }
+
+  const neuroticism = person.traits["neuroticism"] ?? 0.7;
+  return {
+    ...response,
+    rootCause: `psychopathology: ${cluster} — neuroticism=${neuroticism.toFixed(2)}, activated by ${stimulus.type}`,
+    process: `psychopathology: ${clusterProcess}`,
+    behavior: clusterBehavior,
+  };
+}
+
+function motivationTemplate(situation: Situation, response: Response): Response {
+  const { person, stimulus } = situation;
+  const desc = stimulus.description.toLowerCase();
+  const needs = person.needs.map(n => n.toLowerCase());
+
+  const hasAutonomy   = needs.some(n => ["autonomy", "control", "freedom", "independence"].includes(n));
+  const hasCompetence = needs.some(n => ["achievement", "mastery", "competence", "efficacy"].includes(n));
+  const hasRelatedness = needs.some(n => ["belonging", "connection", "love", "affiliation"].includes(n));
+
+  const isExtrinsic = desc.includes("reward") || desc.includes("money") || desc.includes("grade") ||
+                      desc.includes("punish") || desc.includes("pressure") || desc.includes("evaluat");
+  const isIntrinsic = desc.includes("interest") || desc.includes("enjoy") || desc.includes("curious") ||
+                      desc.includes("meaning") || desc.includes("value");
+  const motivationType = isIntrinsic ? "intrinsic" : isExtrinsic ? "extrinsic" : "identified";
+
+  let dominantSDT: string;
+  let sdtBehavior: string;
+
+  if (hasAutonomy && !hasCompetence) {
+    dominantSDT = "autonomy"; sdtBehavior = stimulus.intensity > 0.5 ? "assert-agency" : "maintain-choice";
+  } else if (hasCompetence && !hasAutonomy) {
+    dominantSDT = "competence"; sdtBehavior = "pursue-mastery";
+  } else if (hasRelatedness && !hasAutonomy && !hasCompetence) {
+    dominantSDT = "relatedness"; sdtBehavior = "seek-connection";
+  } else if (hasAutonomy && hasCompetence) {
+    dominantSDT = "autonomy+competence"; sdtBehavior = "self-directed-achievement";
+  } else {
+    dominantSDT = "integrated"; sdtBehavior = response.behavior;
+  }
+
+  const overjustification = isExtrinsic && (hasAutonomy || hasCompetence);
+  return {
+    ...response,
+    rootCause: `SDT: ${dominantSDT} need ${stimulus.personalRelevance > 0.5 ? "frustrated" : "supported"} [${motivationType}${overjustification ? ", overjustification-risk" : ""}]`,
+    process: `motivation: SDT/${motivationType} — ${dominantSDT} × ${response.process}`,
+    behavior: sdtBehavior,
+  };
+}
+
+const DOMAIN_TEMPLATES: Record<string, DomainTemplate> = {
+  "cognitive-bias": cognitiveBiasTemplate,
+  "emotion":        emotionTemplate,
+  "social":         socialTemplate,
+  "decision":       decisionTemplate,
+  "development":    developmentTemplate,
+  "personality":    personalityTemplate,
+  "psychopathology": psychopathologyTemplate,
+  "motivation":     motivationTemplate,
+};
+
+function applyDomainTemplate(domain: string, situation: Situation, response: Response): Response {
+  const template = DOMAIN_TEMPLATES[domain];
+  return template ? template(situation, response) : response;
+}
+
 export function predict(situation: Situation): Response {
   const { person, stimulus } = situation;
   const obs = stimulus.personalRelevance; // 0–1 observation
@@ -245,13 +546,15 @@ export function predict(situation: Situation): Response {
 
   const confidence = Math.min(0.9, 0.4 + pe * 1.2);
 
-  return {
+  const baseResponse: Response = {
     rootCause: `${dominantNeed} need [${domain}] — prediction error ${pe.toFixed(2)}`,
     process: `active-inference: F=${maxF.toFixed(3)}, PE=${pe.toFixed(2)}, arousal=${arousal}, domain=${domain}`,
     emotion,
     behavior,
     confidence,
   };
+
+  return applyDomainTemplate(domain, situation, baseResponse);
 }
 
 // ─── Semantic Scoring ────────────────────────────────────────────────
