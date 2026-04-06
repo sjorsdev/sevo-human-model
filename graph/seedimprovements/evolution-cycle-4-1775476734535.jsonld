@@ -1,0 +1,14 @@
+{
+  "@context": "sevo://v1",
+  "@type": "SeedImprovement",
+  "@id": "evolution-cycle-4-1775476734535",
+  "timestamp": "2026-04-06T11:58:54.535Z",
+  "observation": "Cycle 4: 1 models, best=0.238, weakness: **The model assumes all behavior is surprise-minimization (Active Inference), but catastrophically f",
+  "suggestion": "Focus on: **The model assumes all behavior is surprise-minimization (Active Inference), but catastrophically fails on novelty-seeking and risk-preference:** it ",
+  "evidence": [
+    "cycle:4",
+    "best-fitness:0.238",
+    "population:1"
+  ],
+  "priority": 5
+}
