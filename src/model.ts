@@ -350,7 +350,8 @@ function selectAttractor(
   domain: string,
   personPos: [number, number],
   force: [number, number],
-  person: Situation["person"]
+  person: Situation["person"],
+  narrative?: { agency: number; communion: number }
 ): { attractor: Attractor; depth: number } {
   const attractors = DOMAIN_ATTRACTORS[domain] ?? DOMAIN_ATTRACTORS.emotion;
 
@@ -372,7 +373,16 @@ function selectAttractor(
   let bestDepth = best.baseDepth * arousalMod * historyMod;
 
   for (const a of attractors) {
-    const depth = a.baseDepth * arousalMod * historyMod;
+    let depth = a.baseDepth * arousalMod * historyMod;
+
+    // Narrative alignment modulation (McAdams 1993)
+    // Attractors matching the person's narrative schema are deeper (identity-reinforcing)
+    // Misaligned attractors are shallower (identity-threatening, harder to enter)
+    if (narrative) {
+      const alignment = computeNarrativeAlignment(a.name, narrative);
+      depth *= (0.5 + alignment); // aligned ~×1.5, misaligned ~×0.5
+    }
+
     const dx = xF[0] - a.pos[0];
     const dy = xF[1] - a.pos[1];
     const score = (dx * dx + dy * dy) / Math.max(depth, 0.001);
@@ -1129,6 +1139,88 @@ function applyActiveInference(
   return { ...response, emotion, behavior, rootCause, process: `${process} | ${precTag}` };
 }
 
+// ─── Narrative Agency × Communion Spine (McAdams 1993) ───────────────
+// Extract two dimensions from person.history:
+//   agency:    self-directed action themes ('I decided', 'I achieved', 'I refused')
+//   communion: relational themes ('we connected', 'I helped', 'I belonged')
+// Modulate attractor depths: alignment ∈ [0,1]; depth' = depth × (0.5 + alignment).
+// Aligned attractors → ×1.5 (reinforced identity); misaligned → ×0.5 (identity threat).
+// Math: narrative_vec = [agency, communion]; alignment = cos(attractor_vec, narrative_vec)
+// Source: McAdams, D.P. (1993). The stories we live by. Guilford Press.
+
+const AGENCY_KEYWORDS = [
+  "i decided", "i achieved", "i chose", "i refused", "i won", "i led",
+  "i created", "i built", "i accomplished", "i overcame", "i stood up",
+  "i succeeded", "i took charge", "i made", "i controlled", "i resisted",
+  "decided", "achieved", "chose", "won", "led", "created", "built",
+  "accomplished", "overcame", "controlled", "succeeded", "asserted",
+];
+
+const COMMUNION_KEYWORDS = [
+  "we connected", "i helped", "i belonged", "we shared", "together",
+  "we worked", "i supported", "i cared", "i listened", "we talked",
+  "connected", "helped", "belonged", "shared", "supported", "cared",
+  "listened", "loved", "joined", "united", "cooperated", "gave",
+];
+
+function extractNarrativeTheme(history: string[]): { agency: number; communion: number } {
+  if (!history || history.length === 0) return { agency: 0.5, communion: 0.5 };
+  let agencyCount = 0;
+  let communionCount = 0;
+  for (const entry of history) {
+    const h = entry.toLowerCase();
+    if (AGENCY_KEYWORDS.some(k => h.includes(k))) agencyCount++;
+    if (COMMUNION_KEYWORDS.some(k => h.includes(k))) communionCount++;
+  }
+  // If no keyword matches, default to balanced 0.5
+  const total = history.length;
+  const agency    = agencyCount    > 0 ? agencyCount    / total : 0.5;
+  const communion = communionCount > 0 ? communionCount / total : 0.5;
+  return { agency, communion };
+}
+
+// Agency/communion weights per attractor name ∈ [0,1]: [agency_weight, communion_weight]
+const ATTRACTOR_NARRATIVE_VECS: Record<string, [number, number]> = {
+  // Agency-dominant
+  "assert":          [0.9, 0.1],
+  "pursue-goal":     [0.8, 0.2],
+  "approach-novel":  [0.8, 0.1],
+  "individuate":     [0.9, 0.1],
+  "risk-seeking":    [0.7, 0.1],
+  "approach":        [0.7, 0.2],
+  "self-enhance":    [0.8, 0.2],
+  "explore":         [0.7, 0.3],
+  "compete":         [0.8, 0.1],
+  // Communion-dominant
+  "conform":         [0.2, 0.8],
+  "attach":          [0.1, 0.9],
+  "seek-connection": [0.2, 0.9],
+  "social-engage":   [0.2, 0.8],
+  "seek-support":    [0.2, 0.8],
+  "appease":         [0.1, 0.7],
+  // Mixed / neutral
+  "deliberate":      [0.5, 0.5],
+  "update-belief":   [0.5, 0.5],
+  "seek-reward":     [0.5, 0.3],
+  "avoid-failure":   [0.3, 0.3],
+  "maintain-habit":  [0.3, 0.4],
+  "seek-peer-validation": [0.3, 0.7],
+};
+
+function computeNarrativeAlignment(
+  attractorName: string,
+  narrative: { agency: number; communion: number }
+): number {
+  const vec = ATTRACTOR_NARRATIVE_VECS[attractorName] ?? [0.5, 0.5];
+  const [na, nc] = [narrative.agency, narrative.communion];
+  const [aa, ac] = vec;
+  const dot  = na * aa + nc * ac;
+  const magN = Math.sqrt(na * na + nc * nc);
+  const magA = Math.sqrt(aa * aa + ac * ac);
+  if (magN < 0.001 || magA < 0.001) return 0.5;
+  return dot / (magN * magA); // ∈ (0, 1] since all components ≥ 0
+}
+
 // Threshold above which an attractor basin overrides domain template behavior.
 // Models: habit formation, trauma lock-in, psychopathology rigidity.
 const ATTRACTOR_OVERRIDE_DEPTH = 3.0;
@@ -1209,13 +1301,18 @@ export function predict(situation: Situation): Response {
     behavior = "continue";
   }
 
+  // ── Narrative Agency × Communion (McAdams 1993) ──────────────────────
+  // Extract narrative identity dimensions from person's history.
+  // Modulates attractor depth: identity-aligned basins deepen, misaligned shallow.
+  const narrative = extractNarrativeTheme(person.history ?? []);
+
   // ── Attractor Landscape Dynamics ─────────────────────────────────────
   // Model person as dynamical system; select attractor basin from trajectory.
   // dX/dt = -∇V(X) + F_stimulus; V(X) = Σ depth_i·|X−A_i|²
   // Deep basins (trauma, habit, pathology) override behavior regardless of stimulus.
   const personPos = emotionalStateToPos(person.emotionalState, arousal);
   const force = computeForce(situation);
-  const { attractor, depth } = selectAttractor(domain, personPos, force, person);
+  const { attractor, depth } = selectAttractor(domain, personPos, force, person, narrative);
 
   // Deep attractors override behavior — willpower insufficient against deep basin
   if (depth >= ATTRACTOR_OVERRIDE_DEPTH) {
@@ -1224,12 +1321,13 @@ export function predict(situation: Situation): Response {
 
   const attractorTag = `attractor:${attractor.name}(depth=${depth.toFixed(1)})`;
   const vagalTag = `vagal:${autonomicState}`;
+  const narrativeTag = `narrative:A=${narrative.agency.toFixed(2)},C=${narrative.communion.toFixed(2)}`;
 
   const confidence = Math.min(0.9, 0.4 + pe * 1.2 + (depth >= ATTRACTOR_OVERRIDE_DEPTH ? 0.1 : 0));
 
   const baseResponse: Response = {
     rootCause: `${dominantNeed} need [${domain}] — PE=${pe.toFixed(2)}, basin=${attractor.name}${depth >= ATTRACTOR_OVERRIDE_DEPTH ? " [locked]" : ""}`,
-    process: `active-inference+attractor: F=${maxF.toFixed(3)}, PE=${pe.toFixed(2)}, ${attractorTag}, ${vagalTag}, arousal=${arousal}`,
+    process: `active-inference+attractor: F=${maxF.toFixed(3)}, PE=${pe.toFixed(2)}, ${attractorTag}, ${vagalTag}, ${narrativeTag}, arousal=${arousal}`,
     emotion,
     behavior,
     confidence,
