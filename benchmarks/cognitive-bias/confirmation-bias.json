@@ -1,0 +1,40 @@
+{
+  "id": "cb-confirmation-bias-01",
+  "domain": "cognitive-bias",
+  "name": "Confirmation Bias — Selective Evidence Search",
+  "description": "When a person holds a belief, they preferentially seek, notice, and remember information that confirms it, while ignoring or discounting disconfirming evidence.",
+  "situation": {
+    "context": {
+      "environment": "home, reading news online",
+      "socialSetting": "alone",
+      "timeConstraint": "relaxed"
+    },
+    "person": {
+      "traits": { "openness": 0.4, "neuroticism": 0.5, "conscientiousness": 0.6 },
+      "needs": ["certainty", "coherence"],
+      "beliefs": ["climate change is exaggerated"],
+      "emotionalState": "calm",
+      "arousal": 0.3
+    },
+    "stimulus": {
+      "type": "information",
+      "description": "Encounters two articles: one presenting new evidence for accelerating climate change, another questioning climate model accuracy",
+      "intensity": 0.4,
+      "novelty": 0.3,
+      "personalRelevance": 0.5
+    }
+  },
+  "expected": {
+    "rootCauseType": "evolutionary",
+    "rootCauseMechanism": "cognitive-consistency",
+    "keyProcess": ["belief-protection", "selective-attention"],
+    "emotionChange": "satisfied",
+    "arousalDirection": "stable",
+    "behavior": "spends more time reading the skeptical article, shares it",
+    "mustInclude": ["existing belief", "dissonance reduction"],
+    "mustNotInclude": ["objective evaluation"]
+  },
+  "sources": ["Nickerson 1998 — Confirmation Bias: A Ubiquitous Phenomenon", "Wason 1960 — On the failure to eliminate hypotheses"],
+  "difficulty": 2,
+  "tags": ["belief", "attention", "information-processing"]
+}

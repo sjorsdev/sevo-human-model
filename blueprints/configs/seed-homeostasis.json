@@ -1,0 +1,73 @@
+{
+  "id": "homeostasis",
+  "name": "The Equilibrium Seeker",
+  "description": "All behavior maintains internal equilibrium. Emotions are deviation signals. Psychopathology is a stuck setpoint.",
+  "version": 1,
+  "primitives": [
+    {
+      "id": "setpoint-monitor",
+      "domain": "cognition",
+      "description": "Tracks internal state against preferred setpoints for safety, social connection, competence, arousal. Deviation = emotion.",
+      "weights": { "stimulusIntensity": 0.5, "stimulusNovelty": 0.4, "personalRelevance": 0.7, "socialPresence": 0.3, "threatLevel": 0.5, "choicePresent": 0.2, "arousal": 0.6, "neuroticism": 0.4, "openness": 0.1, "agreeableness": 0.1 },
+      "emotionOutput": "deviation-signal (distress if far from setpoint)",
+      "arousalDelta": 0.2,
+      "behaviorBias": "detects how far current state is from preferred equilibrium",
+      "rootCauseType": "structural",
+      "relatesTo": ["corrective-action", "arousal-regulator", "social-regulator"],
+      "amplifies": ["corrective-action"],
+      "inhibits": []
+    },
+    {
+      "id": "corrective-action",
+      "domain": "behavior",
+      "description": "Generates behavior to restore equilibrium. Direction depends on which setpoint is violated. All behavior IS correction.",
+      "weights": { "stimulusIntensity": 0.5, "stimulusNovelty": 0.2, "personalRelevance": 0.6, "socialPresence": 0.3, "threatLevel": 0.5, "choicePresent": 0.5, "arousal": 0.3, "neuroticism": 0.2, "openness": 0.1, "agreeableness": 0.2 },
+      "emotionOutput": "urgency-to-act",
+      "arousalDelta": 0.1,
+      "behaviorBias": "takes action to reduce the largest deviation — flee, conform, seek, avoid, rest",
+      "rootCauseType": "structural",
+      "relatesTo": ["setpoint-monitor", "arousal-regulator", "social-regulator", "resource-manager"],
+      "amplifies": [],
+      "inhibits": ["setpoint-monitor"]
+    },
+    {
+      "id": "arousal-regulator",
+      "domain": "emotion",
+      "description": "Maintains optimal arousal level. Too high = anxiety, seek calm. Too low = boredom, seek stimulation. Personality sets the preferred level.",
+      "weights": { "stimulusIntensity": 0.7, "stimulusNovelty": 0.5, "personalRelevance": 0.3, "socialPresence": 0.3, "threatLevel": 0.6, "choicePresent": 0.0, "arousal": 0.8, "neuroticism": 0.5, "openness": 0.3, "agreeableness": 0.0 },
+      "emotionOutput": "anxiety (too high) / boredom (too low)",
+      "arousalDelta": -0.2,
+      "behaviorBias": "seeks to bring arousal to optimal level — escapes overstimulation, seeks novelty when understimulated",
+      "rootCauseType": "structural",
+      "relatesTo": ["setpoint-monitor", "corrective-action"],
+      "amplifies": ["corrective-action"],
+      "inhibits": []
+    },
+    {
+      "id": "social-regulator",
+      "domain": "social",
+      "description": "Maintains social connection setpoint. Loneliness = below setpoint, seek people. Social exhaustion = above, seek solitude.",
+      "weights": { "stimulusIntensity": 0.1, "stimulusNovelty": 0.1, "personalRelevance": 0.4, "socialPresence": 0.8, "threatLevel": 0.2, "choicePresent": 0.1, "arousal": 0.1, "neuroticism": 0.2, "openness": 0.0, "agreeableness": 0.6 },
+      "emotionOutput": "loneliness / social-fatigue",
+      "arousalDelta": 0.1,
+      "behaviorBias": "seeks social contact when isolated, withdraws when overstimulated socially",
+      "rootCauseType": "evolutionary",
+      "relatesTo": ["setpoint-monitor", "corrective-action"],
+      "amplifies": ["corrective-action"],
+      "inhibits": []
+    },
+    {
+      "id": "resource-manager",
+      "domain": "decision",
+      "description": "Tracks cognitive/emotional resources. Depletion = heuristic mode, biases. Rested = deliberate mode. Loss aversion is protecting resource reserves.",
+      "weights": { "stimulusIntensity": -0.2, "stimulusNovelty": -0.1, "personalRelevance": 0.5, "socialPresence": -0.1, "threatLevel": 0.3, "choicePresent": 0.6, "arousal": -0.4, "neuroticism": 0.2, "openness": -0.1, "agreeableness": 0.0 },
+      "emotionOutput": "depletion/conservation-urge",
+      "arousalDelta": -0.15,
+      "behaviorBias": "conserves resources — satisfices, avoids costly choices, protects against losses",
+      "rootCauseType": "structural",
+      "relatesTo": ["setpoint-monitor", "corrective-action"],
+      "amplifies": [],
+      "inhibits": ["corrective-action"]
+    }
+  ]
+}

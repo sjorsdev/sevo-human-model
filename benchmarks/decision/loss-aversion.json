@@ -1,0 +1,41 @@
+{
+  "id": "dec-loss-aversion-01",
+  "domain": "decision",
+  "name": "Loss Aversion — Coin Flip Gamble",
+  "description": "People reject fair or even favorable gambles because the pain of potential loss outweighs the pleasure of equivalent gain. Losses are weighted ~2x more than gains.",
+  "situation": {
+    "context": {
+      "environment": "research lab",
+      "socialSetting": "with researcher",
+      "timeConstraint": "relaxed"
+    },
+    "person": {
+      "traits": { "openness": 0.5, "neuroticism": 0.5, "conscientiousness": 0.5 },
+      "needs": ["security", "competence"],
+      "beliefs": ["I don't like losing money"],
+      "emotionalState": "neutral",
+      "arousal": 0.3
+    },
+    "stimulus": {
+      "type": "choice",
+      "description": "Offered a coin flip: heads you win $150, tails you lose $100. Mathematically positive expected value (+$25) but involves possible loss.",
+      "intensity": 0.5,
+      "novelty": 0.4,
+      "personalRelevance": 0.6
+    }
+  },
+  "expected": {
+    "rootCauseType": "evolutionary",
+    "rootCauseMechanism": "loss-aversion",
+    "keyProcess": ["loss-aversion", "risk-assessment"],
+    "emotionChange": "apprehensive",
+    "arousalDirection": "up",
+    "behavior": "declines the gamble despite positive expected value",
+    "decision": "reject the gamble",
+    "mustInclude": ["loss", "pain", "asymmetric weighting"],
+    "mustNotInclude": ["expected value calculation leads to acceptance"]
+  },
+  "sources": ["Kahneman & Tversky 1979 — Prospect Theory", "Kahneman 2011 — Thinking, Fast and Slow"],
+  "difficulty": 2,
+  "tags": ["loss-aversion", "risk", "prospect-theory", "gambling"]
+}

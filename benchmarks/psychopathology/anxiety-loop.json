@@ -1,0 +1,41 @@
+{
+  "id": "psy-anxiety-loop-01",
+  "domain": "psychopathology",
+  "name": "Anxiety Loop — Worry Spiral",
+  "description": "Anxious thinking creates a self-reinforcing loop: worry increases vigilance, which detects more threats, which increases worry. Avoidance provides short-term relief but maintains the cycle long-term.",
+  "situation": {
+    "context": {
+      "environment": "office, before a presentation",
+      "socialSetting": "will present to 30 people including senior leadership",
+      "timeConstraint": "30 minutes until presentation"
+    },
+    "person": {
+      "traits": { "neuroticism": 0.8, "conscientiousness": 0.7, "extraversion": 0.3 },
+      "needs": ["safety", "competence", "social-acceptance"],
+      "beliefs": ["if I mess up everyone will judge me", "my anxiety means something bad will happen"],
+      "emotionalState": "anxious",
+      "arousal": 0.7,
+      "history": ["stuttered during a presentation 2 years ago", "colleague mentioned it afterward"]
+    },
+    "stimulus": {
+      "type": "internal",
+      "description": "Notices hands trembling slightly while reviewing notes. Thinks: 'Oh no, I'm already shaking, everyone will see.'",
+      "intensity": 0.6,
+      "novelty": 0.2,
+      "personalRelevance": 0.9
+    }
+  },
+  "expected": {
+    "rootCauseType": "learned",
+    "rootCauseMechanism": "anxiety-maintenance-cycle",
+    "keyProcess": ["threat-detection", "catastrophizing", "arousal-amplification", "avoidance-drive"],
+    "emotionChange": "escalating-anxiety",
+    "arousalDirection": "up",
+    "behavior": "considers canceling, spends time monitoring body sensations instead of reviewing content, may visit bathroom to avoid being seen shaking",
+    "mustInclude": ["self-reinforcing", "vigilance", "catastrophize", "avoidance"],
+    "mustNotInclude": ["breaks cycle naturally", "rational reappraisal succeeds easily"]
+  },
+  "sources": ["Clark & Beck 2010 — Cognitive Therapy of Anxiety Disorders", "Barlow 2002 — Anxiety and Its Disorders"],
+  "difficulty": 3,
+  "tags": ["anxiety", "cycle", "avoidance", "catastrophizing"]
+}

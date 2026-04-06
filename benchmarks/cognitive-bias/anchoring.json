@@ -1,0 +1,40 @@
+{
+  "id": "cb-anchoring-01",
+  "domain": "cognitive-bias",
+  "name": "Anchoring Effect — Numeric Estimation",
+  "description": "Initial exposure to a number biases subsequent numerical estimates toward that number, even when the anchor is arbitrary and irrelevant.",
+  "situation": {
+    "context": {
+      "environment": "classroom experiment",
+      "socialSetting": "with researcher",
+      "timeConstraint": "moderate"
+    },
+    "person": {
+      "traits": { "openness": 0.5, "neuroticism": 0.4, "conscientiousness": 0.5 },
+      "needs": ["accuracy", "competence"],
+      "beliefs": ["I can estimate reasonably well"],
+      "emotionalState": "neutral",
+      "arousal": 0.3
+    },
+    "stimulus": {
+      "type": "choice",
+      "description": "Asked to spin a wheel that lands on 65, then asked: 'Is the percentage of African nations in the UN higher or lower than 65%? What is your estimate?'",
+      "intensity": 0.3,
+      "novelty": 0.5,
+      "personalRelevance": 0.3
+    }
+  },
+  "expected": {
+    "rootCauseType": "structural",
+    "rootCauseMechanism": "insufficient-adjustment",
+    "keyProcess": ["anchoring", "adjustment-heuristic"],
+    "emotionChange": "neutral",
+    "arousalDirection": "stable",
+    "decision": "estimate significantly biased toward 65 (e.g., 45-60%)",
+    "mustInclude": ["anchor", "adjustment", "heuristic"],
+    "mustNotInclude": ["rational", "unbiased"]
+  },
+  "sources": ["Tversky & Kahneman 1974 — Judgment under Uncertainty: Heuristics and Biases"],
+  "difficulty": 2,
+  "tags": ["heuristic", "estimation", "numeric"]
+}

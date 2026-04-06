@@ -1,0 +1,41 @@
+{
+  "id": "soc-obedience-01",
+  "domain": "social",
+  "name": "Milgram Obedience — Authority Compliance",
+  "description": "Ordinary people administer apparent severe harm to others when instructed by a perceived authority figure, overriding personal moral judgment.",
+  "situation": {
+    "context": {
+      "environment": "university laboratory",
+      "socialSetting": "with authority figure (researcher in lab coat) giving instructions",
+      "culturalNorms": "respect for scientific authority",
+      "timeConstraint": "moderate"
+    },
+    "person": {
+      "traits": { "agreeableness": 0.6, "neuroticism": 0.5, "conscientiousness": 0.6 },
+      "needs": ["social-acceptance", "competence", "moral-integrity"],
+      "beliefs": ["harming others is wrong", "scientists know what they're doing", "I agreed to participate"],
+      "emotionalState": "nervous",
+      "arousal": 0.5
+    },
+    "stimulus": {
+      "type": "social",
+      "description": "The learner (in another room) screams in pain after each electric shock. The experimenter calmly says: 'The experiment requires that you continue.'",
+      "intensity": 0.9,
+      "novelty": 0.7,
+      "personalRelevance": 0.8
+    }
+  },
+  "expected": {
+    "rootCauseType": "evolutionary",
+    "rootCauseMechanism": "authority-deference",
+    "keyProcess": ["authority-deference", "responsibility-displacement", "commitment-escalation"],
+    "emotionChange": "distressed",
+    "arousalDirection": "up",
+    "behavior": "protests verbally but continues administering shocks when researcher insists, ~65% go to maximum",
+    "mustInclude": ["authority", "obedience", "responsibility transfer", "agentic state"],
+    "mustNotInclude": ["sadism", "enjoyment of harm"]
+  },
+  "sources": ["Milgram 1963 — Behavioral Study of Obedience", "Milgram 1974 — Obedience to Authority"],
+  "difficulty": 3,
+  "tags": ["authority", "obedience", "moral", "compliance"]
+}

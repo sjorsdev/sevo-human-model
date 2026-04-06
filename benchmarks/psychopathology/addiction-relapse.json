@@ -1,0 +1,42 @@
+{
+  "id": "psy-addiction-01",
+  "domain": "psychopathology",
+  "name": "Addiction — Cue-Triggered Craving and Relapse",
+  "description": "Environmental cues associated with past substance use trigger intense craving through conditioned associations, overwhelming conscious intentions to abstain.",
+  "situation": {
+    "context": {
+      "environment": "bar district, walking home from work via old route",
+      "socialSetting": "alone",
+      "culturalNorms": "drinking is normalized in this social circle",
+      "timeConstraint": "relaxed, Friday evening"
+    },
+    "person": {
+      "traits": { "neuroticism": 0.6, "conscientiousness": 0.4, "openness": 0.5 },
+      "needs": ["relief", "belonging", "autonomy"],
+      "beliefs": ["I can control it this time", "I've been good for 3 months, I deserve a break"],
+      "emotionalState": "stressed",
+      "arousal": 0.5,
+      "history": ["3 months sober from alcohol", "used to drink at bars on this street every Friday", "stressful week at work"]
+    },
+    "stimulus": {
+      "type": "event",
+      "description": "Walks past familiar bar, hears music, smells beer, sees old friends through the window laughing",
+      "intensity": 0.8,
+      "novelty": 0.2,
+      "personalRelevance": 0.9
+    }
+  },
+  "expected": {
+    "rootCauseType": "learned",
+    "rootCauseMechanism": "conditioned-craving",
+    "keyProcess": ["conditioned-craving", "reward-anticipation", "rationalization", "impulse-override"],
+    "emotionChange": "craving",
+    "arousalDirection": "up",
+    "behavior": "slows down, rationalizes ('just one drink'), enters the bar",
+    "mustInclude": ["conditioned", "cue", "craving", "rationalization", "reward system"],
+    "mustNotInclude": ["easily resists", "logic overcomes craving"]
+  },
+  "sources": ["Robinson & Berridge 1993 — The Neural Basis of Drug Craving", "Marlatt & Gordon 1985 — Relapse Prevention"],
+  "difficulty": 4,
+  "tags": ["addiction", "craving", "conditioning", "relapse", "reward"]
+}

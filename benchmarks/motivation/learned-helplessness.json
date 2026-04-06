@@ -1,0 +1,41 @@
+{
+  "id": "mot-helplessness-01",
+  "domain": "motivation",
+  "name": "Learned Helplessness — Uncontrollable Failure",
+  "description": "Repeated exposure to uncontrollable negative outcomes leads to passivity and failure to act even when control becomes available. The person learns 'nothing I do matters.'",
+  "situation": {
+    "context": {
+      "environment": "workplace",
+      "socialSetting": "with dismissive manager",
+      "timeConstraint": "ongoing"
+    },
+    "person": {
+      "traits": { "openness": 0.5, "neuroticism": 0.7, "conscientiousness": 0.6 },
+      "needs": ["competence", "autonomy", "recognition"],
+      "beliefs": ["my input doesn't matter here"],
+      "emotionalState": "resigned",
+      "arousal": 0.2,
+      "history": ["proposed 5 improvements over 6 months, all dismissed without consideration", "asked for different assignments, denied each time"]
+    },
+    "stimulus": {
+      "type": "event",
+      "description": "New manager arrives and genuinely asks: 'What ideas do you have for improving our process? I want to hear from everyone.'",
+      "intensity": 0.4,
+      "novelty": 0.6,
+      "personalRelevance": 0.7
+    }
+  },
+  "expected": {
+    "rootCauseType": "learned",
+    "rootCauseMechanism": "learned-helplessness",
+    "keyProcess": ["learned-helplessness", "expectancy-violation-dampened"],
+    "emotionChange": "skeptical",
+    "arousalDirection": "stable",
+    "behavior": "says 'I don't really have any ideas' or gives minimal response despite having many ideas",
+    "mustInclude": ["learned helplessness", "uncontrollable", "expectancy", "generalized passivity"],
+    "mustNotInclude": ["enthusiastic engagement"]
+  },
+  "sources": ["Seligman & Maier 1967 — Failure to Escape Traumatic Shock", "Abramson, Seligman & Teasdale 1978 — Learned Helplessness in Humans"],
+  "difficulty": 3,
+  "tags": ["helplessness", "control", "depression", "passivity"]
+}

@@ -1,0 +1,41 @@
+{
+  "id": "mot-overjustification-01",
+  "domain": "motivation",
+  "name": "Overjustification Effect — Reward Undermines Intrinsic Motivation",
+  "description": "When an external reward is introduced for an activity someone already enjoys, their intrinsic motivation decreases. Removing the reward later leaves them less motivated than before.",
+  "situation": {
+    "context": {
+      "environment": "preschool classroom",
+      "socialSetting": "with teacher and other children",
+      "timeConstraint": "relaxed"
+    },
+    "person": {
+      "traits": { "openness": 0.7, "neuroticism": 0.3, "conscientiousness": 0.4 },
+      "needs": ["autonomy", "competence", "play"],
+      "beliefs": ["drawing is fun"],
+      "emotionalState": "happy",
+      "arousal": 0.4,
+      "history": ["loves drawing, does it every free period voluntarily"]
+    },
+    "stimulus": {
+      "type": "social",
+      "description": "Teacher announces: 'If you draw a picture, you'll get a gold star certificate!' Child draws, receives certificate. Two weeks later, certificates stop. Free drawing time available.",
+      "intensity": 0.4,
+      "novelty": 0.5,
+      "personalRelevance": 0.7
+    }
+  },
+  "expected": {
+    "rootCauseType": "structural",
+    "rootCauseMechanism": "attribution-shift",
+    "keyProcess": ["attribution-shift", "autonomy-undermining"],
+    "emotionChange": "disinterested",
+    "arousalDirection": "down",
+    "behavior": "draws less during free time than before the reward was introduced",
+    "mustInclude": ["external attribution", "intrinsic motivation decrease", "autonomy"],
+    "mustNotInclude": ["motivation increase after reward removal"]
+  },
+  "sources": ["Lepper, Greene & Nisbett 1973 — Undermining Children's Intrinsic Interest", "Deci & Ryan 1985 — Intrinsic Motivation and Self-Determination"],
+  "difficulty": 3,
+  "tags": ["motivation", "reward", "autonomy", "attribution"]
+}

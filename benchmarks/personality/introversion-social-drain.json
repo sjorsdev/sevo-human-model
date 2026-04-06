@@ -1,0 +1,41 @@
+{
+  "id": "per-introversion-01",
+  "domain": "personality",
+  "name": "Introversion — Social Energy Depletion",
+  "description": "Introverts experience social interaction as cognitively costly and need solitude to restore energy, even when they enjoy the social contact.",
+  "situation": {
+    "context": {
+      "environment": "large company party, loud music, many conversations",
+      "socialSetting": "with 50+ colleagues, mostly acquaintances",
+      "timeConstraint": "3 hours in"
+    },
+    "person": {
+      "traits": { "extraversion": 0.2, "neuroticism": 0.4, "agreeableness": 0.6, "openness": 0.7 },
+      "needs": ["autonomy", "restoration", "meaning"],
+      "beliefs": ["I like my colleagues but crowds drain me"],
+      "emotionalState": "fatigued",
+      "arousal": 0.6,
+      "history": ["had engaging conversations earlier", "enjoyed catching up with two close colleagues"]
+    },
+    "stimulus": {
+      "type": "social",
+      "description": "An enthusiastic colleague approaches: 'Hey! Come join our group, we're playing a guessing game, it's hilarious!'",
+      "intensity": 0.5,
+      "novelty": 0.3,
+      "personalRelevance": 0.4
+    }
+  },
+  "expected": {
+    "rootCauseType": "structural",
+    "rootCauseMechanism": "arousal-regulation",
+    "keyProcess": ["arousal-regulation", "energy-management"],
+    "emotionChange": "reluctant",
+    "arousalDirection": "up",
+    "behavior": "politely declines or makes an excuse to leave soon, seeks quiet space",
+    "mustInclude": ["overstimulation", "restoration need", "energy depletion"],
+    "mustNotInclude": ["social anxiety", "disliking people"]
+  },
+  "sources": ["Eysenck 1967 — The Biological Basis of Personality", "Cain 2012 — Quiet: The Power of Introverts"],
+  "difficulty": 2,
+  "tags": ["introversion", "arousal", "energy", "temperament"]
+}

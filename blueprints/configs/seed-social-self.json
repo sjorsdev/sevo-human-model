@@ -1,0 +1,73 @@
+{
+  "id": "social-self",
+  "name": "The Social Self",
+  "description": "All behavior serves the social identity. Self-model, other-model, status, threat, face-management.",
+  "version": 1,
+  "primitives": [
+    {
+      "id": "self-model",
+      "domain": "identity",
+      "description": "Who I think I am — roles, values, capabilities, narrative. What we protect when defensive.",
+      "weights": { "stimulusIntensity": 0.3, "stimulusNovelty": 0.2, "personalRelevance": 0.8, "socialPresence": 0.3, "threatLevel": 0.4, "choicePresent": 0.3, "arousal": 0.1, "neuroticism": 0.3, "openness": 0.2, "agreeableness": 0.0 },
+      "emotionOutput": "self-awareness",
+      "arousalDelta": 0.1,
+      "behaviorBias": "activates identity facets relevant to situation, checks 'what does this say about me'",
+      "rootCauseType": "cultural",
+      "relatesTo": ["other-model", "identity-threat", "face-management"],
+      "amplifies": ["identity-threat"],
+      "inhibits": []
+    },
+    {
+      "id": "other-model",
+      "domain": "social-cognition",
+      "description": "Theory of mind — model of what others think, feel, expect. Empathy, manipulation, social intelligence.",
+      "weights": { "stimulusIntensity": 0.1, "stimulusNovelty": 0.2, "personalRelevance": 0.3, "socialPresence": 0.9, "threatLevel": 0.1, "choicePresent": 0.0, "arousal": 0.0, "neuroticism": 0.1, "openness": 0.1, "agreeableness": 0.5 },
+      "emotionOutput": "empathic-resonance",
+      "arousalDelta": 0.05,
+      "behaviorBias": "reads social cues, predicts others' expectations, adjusts impression",
+      "rootCauseType": "evolutionary",
+      "relatesTo": ["self-model", "status-tracker", "face-management"],
+      "amplifies": ["face-management"],
+      "inhibits": []
+    },
+    {
+      "id": "status-tracker",
+      "domain": "social",
+      "description": "Monitors social hierarchy position. Pride when rising, shame when falling. Drives competition, deference.",
+      "weights": { "stimulusIntensity": 0.3, "stimulusNovelty": 0.1, "personalRelevance": 0.5, "socialPresence": 0.8, "threatLevel": 0.4, "choicePresent": 0.2, "arousal": 0.2, "neuroticism": 0.3, "openness": 0.0, "agreeableness": -0.2 },
+      "emotionOutput": "pride/shame",
+      "arousalDelta": 0.2,
+      "behaviorBias": "seeks to maintain or improve social standing, avoids status loss",
+      "rootCauseType": "evolutionary",
+      "relatesTo": ["self-model", "other-model", "identity-threat"],
+      "amplifies": ["identity-threat"],
+      "inhibits": []
+    },
+    {
+      "id": "identity-threat",
+      "domain": "emotion",
+      "description": "Alarm when self-model is threatened. Anxiety=anticipated, shame=status-lost, anger=violated, grief=destroyed.",
+      "weights": { "stimulusIntensity": 0.6, "stimulusNovelty": 0.3, "personalRelevance": 0.8, "socialPresence": 0.4, "threatLevel": 0.7, "choicePresent": 0.2, "arousal": 0.4, "neuroticism": 0.6, "openness": -0.2, "agreeableness": 0.0 },
+      "emotionOutput": "anxiety/shame/anger",
+      "arousalDelta": 0.4,
+      "behaviorBias": "defensive, seeks to protect self-narrative, dismisses threats",
+      "rootCauseType": "evolutionary",
+      "relatesTo": ["self-model", "status-tracker", "face-management"],
+      "amplifies": ["face-management"],
+      "inhibits": []
+    },
+    {
+      "id": "face-management",
+      "domain": "behavior",
+      "description": "All behavior serves face — the public self. Conformity, achievement, aggression are all face choices.",
+      "weights": { "stimulusIntensity": 0.3, "stimulusNovelty": 0.1, "personalRelevance": 0.5, "socialPresence": 0.7, "threatLevel": 0.4, "choicePresent": 0.4, "arousal": 0.2, "neuroticism": 0.2, "openness": 0.0, "agreeableness": 0.4 },
+      "emotionOutput": "social-composure",
+      "arousalDelta": -0.1,
+      "behaviorBias": "selects behavior that best protects or advances social self",
+      "rootCauseType": "cultural",
+      "relatesTo": ["self-model", "other-model", "identity-threat", "status-tracker"],
+      "amplifies": [],
+      "inhibits": ["identity-threat"]
+    }
+  ]
+}

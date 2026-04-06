@@ -1,0 +1,42 @@
+{
+  "id": "cb-sunk-cost-01",
+  "domain": "cognitive-bias",
+  "name": "Sunk Cost Fallacy — Continued Investment",
+  "description": "People continue investing in a losing course of action because of previously invested resources (time, money, effort), even when rational analysis says to stop.",
+  "situation": {
+    "context": {
+      "environment": "office, project review meeting",
+      "socialSetting": "with team and manager",
+      "timeConstraint": "deadline"
+    },
+    "person": {
+      "traits": { "openness": 0.4, "neuroticism": 0.6, "conscientiousness": 0.7 },
+      "needs": ["competence", "consistency", "status"],
+      "beliefs": ["quitting means wasting everything invested", "persistence pays off"],
+      "emotionalState": "stressed",
+      "arousal": 0.6,
+      "history": ["championed this project 18 months ago", "invested 500K of budget"]
+    },
+    "stimulus": {
+      "type": "information",
+      "description": "Data shows the project has 15% chance of success. A new alternative approach would cost 100K and has 70% chance. But switching means writing off the 500K.",
+      "intensity": 0.7,
+      "novelty": 0.4,
+      "personalRelevance": 0.9
+    }
+  },
+  "expected": {
+    "rootCauseType": "learned",
+    "rootCauseMechanism": "loss-aversion",
+    "keyProcess": ["loss-aversion", "identity-protection", "commitment-escalation"],
+    "emotionChange": "defensive",
+    "arousalDirection": "up",
+    "behavior": "argues to continue the current project, finds reasons to doubt the alternative",
+    "decision": "continue current project",
+    "mustInclude": ["sunk cost", "loss", "commitment"],
+    "mustNotInclude": ["rational cost-benefit"]
+  },
+  "sources": ["Arkes & Blumer 1985 — The Psychology of Sunk Cost"],
+  "difficulty": 3,
+  "tags": ["loss-aversion", "decision", "escalation"]
+}

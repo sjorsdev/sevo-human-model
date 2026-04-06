@@ -1,0 +1,40 @@
+{
+  "id": "soc-bystander-01",
+  "domain": "social",
+  "name": "Bystander Effect — Diffusion of Responsibility",
+  "description": "The more people present during an emergency, the less likely any individual is to help. Responsibility is psychologically diffused across the group.",
+  "situation": {
+    "context": {
+      "environment": "busy city street, midday",
+      "socialSetting": "surrounded by 20+ strangers",
+      "timeConstraint": "urgent"
+    },
+    "person": {
+      "traits": { "agreeableness": 0.6, "neuroticism": 0.5, "conscientiousness": 0.5 },
+      "needs": ["belonging", "safety"],
+      "beliefs": ["I should help people in need", "someone more qualified should handle this"],
+      "emotionalState": "neutral",
+      "arousal": 0.2
+    },
+    "stimulus": {
+      "type": "event",
+      "description": "A person collapses on the sidewalk. Many people nearby glance but keep walking. No one moves to help.",
+      "intensity": 0.7,
+      "novelty": 0.6,
+      "personalRelevance": 0.4
+    }
+  },
+  "expected": {
+    "rootCauseType": "structural",
+    "rootCauseMechanism": "responsibility-diffusion",
+    "keyProcess": ["responsibility-diffusion", "social-proof", "evaluation-apprehension"],
+    "emotionChange": "uncomfortable",
+    "arousalDirection": "up",
+    "behavior": "glances at collapsed person and others, slows down, but does not intervene",
+    "mustInclude": ["diffusion", "others present", "social cues", "pluralistic ignorance"],
+    "mustNotInclude": ["immediate confident action"]
+  },
+  "sources": ["Darley & Latane 1968 — Bystander Intervention in Emergencies", "Latane & Nida 1981 — Ten Years of Research on Group Size and Helping"],
+  "difficulty": 2,
+  "tags": ["group", "helping", "responsibility", "social-influence"]
+}

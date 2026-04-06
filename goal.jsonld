@@ -1,0 +1,43 @@
+{
+  "@context": "sevo://v1",
+  "@type": "Goal",
+  "@id": "goal:human-model-quality",
+  "name": "Human Model Quality",
+  "description": "Evolve the most compact, accurate model of human thinking, psychology, and behavior. The best model explains the widest range of phenomena with the fewest primitives.",
+  "metric": "ModelScore",
+  "formula": "(coverage × meanAccuracy × coherence) / sqrt(primitiveCount)",
+  "components": {
+    "accuracy": {
+      "description": "How well model outputs match known psychological phenomena. Explanations must feel correct and obviously right.",
+      "range": [0, 1],
+      "weight": 0.3
+    },
+    "coverage": {
+      "description": "Fraction of benchmark domains the model can explain above threshold",
+      "range": [0, 1],
+      "weight": 0.3
+    },
+    "coherence": {
+      "description": "How well primitives form a connected, logical system with clear relations. Not a bag of tricks — a unified theory.",
+      "range": [0, 1],
+      "weight": 0.25
+    },
+    "compactness": {
+      "description": "Inverse of primitive count — fewer primitives score higher. Tiebreaker: if scores are equal, more compact model wins.",
+      "formula": "1 / sqrt(primitiveCount)",
+      "weight": 0.15
+    }
+  },
+  "domains": [
+    "cognitive-bias",
+    "emotion",
+    "social",
+    "decision",
+    "development",
+    "personality",
+    "psychopathology",
+    "motivation"
+  ],
+  "accuracyThreshold": 0.5,
+  "direction": "maximize"
+}

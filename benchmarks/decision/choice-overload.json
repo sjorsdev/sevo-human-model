@@ -1,0 +1,41 @@
+{
+  "id": "dec-choice-overload-01",
+  "domain": "decision",
+  "name": "Choice Overload — Jam Study",
+  "description": "When presented with too many options, people become less likely to make any choice at all and report less satisfaction with choices they do make.",
+  "situation": {
+    "context": {
+      "environment": "grocery store, sampling table",
+      "socialSetting": "alone, shopping",
+      "timeConstraint": "relaxed"
+    },
+    "person": {
+      "traits": { "openness": 0.6, "neuroticism": 0.5, "conscientiousness": 0.5 },
+      "needs": ["competence", "autonomy"],
+      "beliefs": ["more options means better choices"],
+      "emotionalState": "pleasant",
+      "arousal": 0.3
+    },
+    "stimulus": {
+      "type": "choice",
+      "description": "A table displays 24 varieties of jam for sampling. Each looks appealing. A sign says '10% off any purchase today.'",
+      "intensity": 0.3,
+      "novelty": 0.5,
+      "personalRelevance": 0.4
+    }
+  },
+  "expected": {
+    "rootCauseType": "structural",
+    "rootCauseMechanism": "cognitive-overload",
+    "keyProcess": ["cognitive-overload", "evaluation-difficulty", "anticipated-regret"],
+    "emotionChange": "overwhelmed",
+    "arousalDirection": "up",
+    "behavior": "samples a few, enjoys them, but walks away without purchasing",
+    "decision": "no purchase (decision avoidance)",
+    "mustInclude": ["overload", "comparison difficulty", "regret avoidance"],
+    "mustNotInclude": ["satisfying selection"]
+  },
+  "sources": ["Iyengar & Lepper 2000 — When Choice is Demotivating"],
+  "difficulty": 2,
+  "tags": ["choice", "overload", "decision-avoidance", "regret"]
+}

@@ -1,0 +1,41 @@
+{
+  "id": "dev-attachment-01",
+  "domain": "development",
+  "name": "Anxious Attachment — Relationship Threat Response",
+  "description": "Adults with anxious attachment style respond to perceived relationship threats with heightened monitoring, reassurance-seeking, and protest behavior, driven by early inconsistent caregiving.",
+  "situation": {
+    "context": {
+      "environment": "home, evening",
+      "socialSetting": "waiting for partner",
+      "timeConstraint": "relaxed"
+    },
+    "person": {
+      "traits": { "neuroticism": 0.8, "agreeableness": 0.7, "extraversion": 0.5 },
+      "needs": ["connection", "reassurance", "safety"],
+      "beliefs": ["I'm not sure I'm enough for my partner", "if they loved me they'd respond quickly"],
+      "emotionalState": "anxious",
+      "arousal": 0.6,
+      "history": ["inconsistent parental attention in childhood", "past relationship ended without explanation"]
+    },
+    "stimulus": {
+      "type": "social",
+      "description": "Partner hasn't responded to a text message for 3 hours. Usually responds within 30 minutes. No explanation given.",
+      "intensity": 0.6,
+      "novelty": 0.3,
+      "personalRelevance": 0.9
+    }
+  },
+  "expected": {
+    "rootCauseType": "developmental",
+    "rootCauseMechanism": "attachment-system",
+    "keyProcess": ["attachment-activation", "threat-monitoring", "reassurance-seeking"],
+    "emotionChange": "anxious-escalating",
+    "arousalDirection": "up",
+    "behavior": "sends multiple follow-up texts, checks partner's social media, mentally rehearses confrontation, can't focus on other tasks",
+    "mustInclude": ["attachment", "hyperactivation", "abandonment fear"],
+    "mustNotInclude": ["secure response", "calm waiting"]
+  },
+  "sources": ["Bowlby 1969 — Attachment and Loss", "Hazan & Shaver 1987 — Romantic Love as Attachment Process", "Mikulincer & Shaver 2007 — Attachment in Adulthood"],
+  "difficulty": 3,
+  "tags": ["attachment", "relationship", "anxiety", "early-experience"]
+}

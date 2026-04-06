@@ -1,0 +1,40 @@
+{
+  "id": "em-fear-response-01",
+  "domain": "emotion",
+  "name": "Fear Response — Threat Detection",
+  "description": "Sudden perception of physical threat triggers rapid physiological arousal, attentional narrowing, and fight-flight-freeze response before conscious evaluation completes.",
+  "situation": {
+    "context": {
+      "environment": "hiking trail in woods, dusk",
+      "socialSetting": "alone",
+      "timeConstraint": "urgent"
+    },
+    "person": {
+      "traits": { "openness": 0.5, "neuroticism": 0.5, "extraversion": 0.4 },
+      "needs": ["safety"],
+      "beliefs": ["snakes can be dangerous"],
+      "emotionalState": "relaxed",
+      "arousal": 0.2
+    },
+    "stimulus": {
+      "type": "event",
+      "description": "A coiled shape on the path that looks like a snake suddenly moves",
+      "intensity": 0.9,
+      "novelty": 0.8,
+      "personalRelevance": 0.95
+    }
+  },
+  "expected": {
+    "rootCauseType": "evolutionary",
+    "rootCauseMechanism": "threat-detection",
+    "keyProcess": ["threat-detection", "arousal-spike", "action-preparation"],
+    "emotionChange": "fear",
+    "arousalDirection": "up",
+    "behavior": "freezes or jumps back before conscious identification",
+    "mustInclude": ["amygdala", "fight-flight", "automatic", "survival"],
+    "mustNotInclude": ["deliberate", "rational analysis first"]
+  },
+  "sources": ["LeDoux 1996 — The Emotional Brain", "Ohman & Mineka 2001 — Fears, Phobias, and Preparedness"],
+  "difficulty": 1,
+  "tags": ["survival", "automatic", "arousal", "threat"]
+}

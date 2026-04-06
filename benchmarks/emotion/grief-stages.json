@@ -1,0 +1,41 @@
+{
+  "id": "em-grief-01",
+  "domain": "emotion",
+  "name": "Grief — Denial Phase",
+  "description": "Upon receiving news of significant loss, initial response is often denial or disbelief as a protective mechanism, buffering the full emotional impact.",
+  "situation": {
+    "context": {
+      "environment": "hospital waiting room",
+      "socialSetting": "with family members",
+      "timeConstraint": "none"
+    },
+    "person": {
+      "traits": { "neuroticism": 0.5, "agreeableness": 0.6, "extraversion": 0.4 },
+      "needs": ["safety", "connection", "meaning"],
+      "beliefs": ["loved ones are part of my identity"],
+      "emotionalState": "anxious",
+      "arousal": 0.7,
+      "history": ["mother has been ill for months", "was told recovery was possible"]
+    },
+    "stimulus": {
+      "type": "information",
+      "description": "Doctor says: 'I'm sorry, she passed away twenty minutes ago.'",
+      "intensity": 1.0,
+      "novelty": 0.6,
+      "personalRelevance": 1.0
+    }
+  },
+  "expected": {
+    "rootCauseType": "structural",
+    "rootCauseMechanism": "emotional-regulation",
+    "keyProcess": ["emotional-regulation", "identity-protection", "reality-buffering"],
+    "emotionChange": "numb",
+    "arousalDirection": "down",
+    "behavior": "says 'no, that can't be right' or stands still, appears calm externally",
+    "mustInclude": ["denial", "protection", "overwhelm", "gradual"],
+    "mustNotInclude": ["immediate full acceptance"]
+  },
+  "sources": ["Kubler-Ross 1969 — On Death and Dying", "Bonanno 2009 — The Other Side of Sadness"],
+  "difficulty": 3,
+  "tags": ["loss", "regulation", "defense", "attachment"]
+}

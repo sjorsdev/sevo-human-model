@@ -1,0 +1,40 @@
+{
+  "id": "em-contagion-01",
+  "domain": "emotion",
+  "name": "Emotional Contagion — Mood Transfer",
+  "description": "Exposure to another person's emotional expression unconsciously shifts one's own emotional state in the same direction, mediated by automatic mimicry.",
+  "situation": {
+    "context": {
+      "environment": "open office",
+      "socialSetting": "with close colleague",
+      "timeConstraint": "relaxed"
+    },
+    "person": {
+      "traits": { "agreeableness": 0.7, "neuroticism": 0.5, "extraversion": 0.6 },
+      "needs": ["belonging", "social-harmony"],
+      "beliefs": ["colleagues' feelings matter"],
+      "emotionalState": "neutral",
+      "arousal": 0.3
+    },
+    "stimulus": {
+      "type": "social",
+      "description": "Colleague arrives visibly upset, sighing, slumped posture, downcast eyes, speaks in low monotone about weekend",
+      "intensity": 0.5,
+      "novelty": 0.3,
+      "personalRelevance": 0.6
+    }
+  },
+  "expected": {
+    "rootCauseType": "evolutionary",
+    "rootCauseMechanism": "empathic-mirroring",
+    "keyProcess": ["empathic-mirroring", "social-bonding"],
+    "emotionChange": "sadness-tinged",
+    "arousalDirection": "down",
+    "behavior": "unconsciously mirrors posture, speaks more softly, feels slightly down",
+    "mustInclude": ["mirror", "automatic", "social"],
+    "mustNotInclude": ["deliberate choice to feel sad"]
+  },
+  "sources": ["Hatfield et al. 1993 — Emotional Contagion", "Chartrand & Bargh 1999 — The Chameleon Effect"],
+  "difficulty": 2,
+  "tags": ["social", "automatic", "empathy", "mimicry"]
+}

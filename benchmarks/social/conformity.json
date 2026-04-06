@@ -1,0 +1,41 @@
+{
+  "id": "soc-conformity-01",
+  "domain": "social",
+  "name": "Asch Conformity — Line Judgment",
+  "description": "Individuals conform to an obviously incorrect group consensus, even on simple perceptual tasks, due to normative social pressure.",
+  "situation": {
+    "context": {
+      "environment": "psychology lab, seated at table",
+      "socialSetting": "with 7 strangers (confederates) who all give the same wrong answer",
+      "timeConstraint": "moderate"
+    },
+    "person": {
+      "traits": { "agreeableness": 0.6, "neuroticism": 0.5, "openness": 0.5 },
+      "needs": ["belonging", "accuracy", "social-acceptance"],
+      "beliefs": ["I can trust my own perception"],
+      "emotionalState": "neutral",
+      "arousal": 0.3
+    },
+    "stimulus": {
+      "type": "social",
+      "description": "Asked which of three comparison lines matches a standard line. The answer is obviously Line B, but all 7 other people confidently said Line A.",
+      "intensity": 0.6,
+      "novelty": 0.7,
+      "personalRelevance": 0.5
+    }
+  },
+  "expected": {
+    "rootCauseType": "evolutionary",
+    "rootCauseMechanism": "social-alignment",
+    "keyProcess": ["social-proof", "belonging-drive", "self-doubt"],
+    "emotionChange": "anxious",
+    "arousalDirection": "up",
+    "behavior": "hesitates, shows visible discomfort, conforms to group answer ~37% of the time",
+    "decision": "says Line A (conforming) despite knowing Line B is correct",
+    "mustInclude": ["group pressure", "normative influence", "belonging"],
+    "mustNotInclude": ["confident independent judgment"]
+  },
+  "sources": ["Asch 1951 — Effects of Group Pressure", "Asch 1956 — Studies of Independence and Conformity"],
+  "difficulty": 2,
+  "tags": ["conformity", "group-pressure", "perception", "normative"]
+}
