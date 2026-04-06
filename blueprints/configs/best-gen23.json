@@ -1,0 +1,99 @@
+{
+  "id": "social-self-mmnmvihrj-mmnmvihrq-mmnmvihrv-mmnmvihrz-mmnmvj0eb-mmnmvj0ee-mmnmvj0eh-mmnmvj0ek-mmnmvjkq6-mmnmvjkq9-mmnmvjkqc-mmnmvk0c1-mmnmvkjew-mmnmvkjf2",
+  "name": "The Social Self (compact) (compact)",
+  "description": "All behavior serves the social identity. Self-model, other-model, status, threat, face-management.",
+  "version": 15,
+  "primitives": [
+    {
+      "id": "status-tracker",
+      "domain": "social",
+      "description": "Monitors social hierarchy position. Pride when rising, shame when falling. Drives competition, deference.",
+      "weights": {
+        "stimulusIntensity": 0.13047275464211472,
+        "stimulusNovelty": 0.13912952067717793,
+        "personalRelevance": 0.4598186413465771,
+        "socialPresence": 0.8,
+        "threatLevel": 0.25692913585391364,
+        "choicePresent": 0.4506034809218586,
+        "arousal": -0.03673305020698227,
+        "neuroticism": 0.06025506879869151,
+        "openness": -0.22067592622388713,
+        "agreeableness": -0.4261435608254176
+      },
+      "emotionOutput": "pride/shame",
+      "arousalDelta": 0.2,
+      "behaviorBias": "seeks to maintain or improve social standing to reduce uncertainty",
+      "rootCauseType": "evolutionary",
+      "relatesTo": [
+        "self-model",
+        "other-model",
+        "identity-threat"
+      ],
+      "amplifies": [
+        "identity-threat"
+      ],
+      "inhibits": []
+    },
+    {
+      "id": "identity-threat",
+      "domain": "emotion",
+      "description": "Alarm when self-model is threatened. Anxiety=anticipated, shame=status-lost, anger=violated, grief=destroyed.",
+      "weights": {
+        "stimulusIntensity": 0.7439112306761456,
+        "stimulusNovelty": 0.30935610412748193,
+        "personalRelevance": 0.6890542321656834,
+        "socialPresence": 0.3856090671433124,
+        "threatLevel": 0.8713982540496178,
+        "choicePresent": 0.06310554328885734,
+        "arousal": -0.08514573213396245,
+        "neuroticism": 0.7669297893580181,
+        "openness": -0.4065337440304906,
+        "agreeableness": 0.13557464119894286
+      },
+      "emotionOutput": "anxiety/shame/anger",
+      "arousalDelta": 0.4,
+      "behaviorBias": "defensive with visible conflict despite internal resistance",
+      "rootCauseType": "evolutionary",
+      "relatesTo": [
+        "self-model",
+        "status-tracker",
+        "face-management"
+      ],
+      "amplifies": [
+        "face-management"
+      ],
+      "inhibits": []
+    },
+    {
+      "id": "face-management",
+      "domain": "behavior",
+      "description": "All behavior serves face — the public self. Conformity, achievement, aggression are all face choices.",
+      "weights": {
+        "stimulusIntensity": 0.06279802311444985,
+        "stimulusNovelty": -0.25813603068005064,
+        "personalRelevance": 0.6233181915472974,
+        "socialPresence": 0.6128574349958572,
+        "threatLevel": 0.5806880003043815,
+        "choicePresent": 0.4135882667923716,
+        "arousal": 0.16042939369273357,
+        "neuroticism": 0.16285189903275793,
+        "openness": -0.21383845808560598,
+        "agreeableness": 0.34218646086400056
+      },
+      "emotionOutput": "social-composure",
+      "arousalDelta": -0.1,
+      "behaviorBias": "selects behavior that best protects or advances social self impulsively, then reconsiders",
+      "rootCauseType": "cultural",
+      "relatesTo": [
+        "self-model",
+        "other-model",
+        "identity-threat",
+        "status-tracker"
+      ],
+      "amplifies": [],
+      "inhibits": [
+        "identity-threat"
+      ]
+    }
+  ]
+}
