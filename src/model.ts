@@ -102,21 +102,65 @@ export function predict(situation: Situation): Response {
   };
 }
 
+// ─── Semantic Scoring ────────────────────────────────────────────────
+// Score a single benchmark response against expected fields.
+// emotionMatch: +1 if response.emotion appears in emotionChange or vice versa
+// behaviorMatch: +1 if response.behavior overlaps with expected.behavior
+// mustIncludeHit: +1 if any mustInclude term found in combined output text
+// mustNotIncludePenalty: -1 if any mustNotInclude term found in combined output
+// Normalize by maxPossible (count of positive dimensions with criteria defined).
+
+import type { ExpectedResponse } from "./human-types.ts";
+
+function scoreBenchmark(response: Response, expected: ExpectedResponse): number {
+  const combined = `${response.emotion} ${response.behavior} ${response.rootCause} ${response.process}`.toLowerCase();
+  let score = 0;
+  let maxScore = 0;
+
+  if (expected.emotionChange !== undefined) {
+    maxScore += 1;
+    const exp = expected.emotionChange.toLowerCase();
+    const got = response.emotion.toLowerCase();
+    if (exp.includes(got) || got.includes(exp) || combined.includes(exp)) score += 1;
+  }
+
+  if (expected.behavior !== undefined) {
+    maxScore += 1;
+    const expB = expected.behavior.toLowerCase();
+    const gotB = response.behavior.toLowerCase();
+    // token overlap: any word >3 chars from expected appears in response behavior, or vice versa
+    const expTokens = expB.split(/\W+/).filter((w) => w.length > 3);
+    if (gotB.split(/\W+/).some((w) => w.length > 3 && expB.includes(w)) ||
+        expTokens.some((w) => gotB.includes(w))) score += 1;
+  }
+
+  if (expected.mustInclude && expected.mustInclude.length > 0) {
+    maxScore += 1;
+    if (expected.mustInclude.some((term) => combined.includes(term.toLowerCase()))) score += 1;
+  }
+
+  if (expected.mustNotInclude && expected.mustNotInclude.length > 0) {
+    if (expected.mustNotInclude.some((term) => combined.includes(term.toLowerCase()))) score -= 1;
+  }
+
+  if (maxScore === 0) return 0.5; // no scoreable criteria → neutral
+  return Math.max(0, score) / maxScore;
+}
+
 // ─── Evaluation: run model against all benchmarks ────────────────────
 
 export async function evaluate(): Promise<{
   fitness: number;
-  results: { benchmark: string; response: Response }[];
+  results: { benchmark: string; response: Response; score: number }[];
 }> {
   const benchmarks = await loadBenchmarks();
-  const results = benchmarks.map((b) => ({
-    benchmark: `[${b.domain}] ${b.name}`,
-    response: predict(b.situation as Situation),
-  }));
+  const results = benchmarks.map((b) => {
+    const response = predict(b.situation as Situation);
+    const score = scoreBenchmark(response, b.expected);
+    return { benchmark: `[${b.domain}] ${b.name}`, response, score };
+  });
 
-  // Fitness: fraction of benchmarks where confidence > 0
-  const active = results.filter((r) => r.response.confidence > 0).length;
-  const fitness = active / Math.max(results.length, 1);
+  const fitness = results.reduce((sum, r) => sum + r.score, 0) / Math.max(results.length, 1);
 
   return { fitness, results };
 }
