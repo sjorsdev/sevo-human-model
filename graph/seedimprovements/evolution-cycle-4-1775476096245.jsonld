@@ -1,0 +1,14 @@
+{
+  "@context": "sevo://v1",
+  "@type": "SeedImprovement",
+  "@id": "evolution-cycle-4-1775476096245",
+  "timestamp": "2026-04-06T11:48:16.245Z",
+  "observation": "Cycle 4: 1 models, best=0.238, weakness: **The model bottlenecks all behavior through active inference (surprise minimization), but humans ex",
+  "suggestion": "Focus on: **The model bottlenecks all behavior through active inference (surprise minimization), but humans exhibit broad behaviors it can't explain: novelty-se",
+  "evidence": [
+    "cycle:4",
+    "best-fitness:0.238",
+    "population:1"
+  ],
+  "priority": 5
+}
