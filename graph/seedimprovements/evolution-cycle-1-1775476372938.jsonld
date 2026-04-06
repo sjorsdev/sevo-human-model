@@ -1,0 +1,14 @@
+{
+  "@context": "sevo://v1",
+  "@type": "SeedImprovement",
+  "@id": "evolution-cycle-1-1775476372938",
+  "timestamp": "2026-04-06T11:52:52.938Z",
+  "observation": "Cycle 1: 1 models, best=0.238, weakness: The model has **no mechanism for volitional agency or abstract value-driven behavior** — it explains",
+  "suggestion": "Focus on: The model has **no mechanism for volitional agency or abstract value-driven behavior** — it explains reactive emotional responses (via polyvagal gatin",
+  "evidence": [
+    "cycle:1",
+    "best-fitness:0.238",
+    "population:1"
+  ],
+  "priority": 5
+}
