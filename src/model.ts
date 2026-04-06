@@ -907,6 +907,92 @@ function applyRegulatoryFocus(
   return { ...response, emotion, behavior, rootCause, process };
 }
 
+// ─── Cognitive Dissonance Detector (Festinger 1957) ──────────────────
+// When stimulus reveals a belief-behavior gap or belief-belief conflict,
+// compute dissonance D = Σ|b_i × b_j| × personalRelevance.
+// Three resolution strategies mirror attractor basin capture:
+//   rationalize  (c > 0.6): high commitment → justify prior behavior
+//   trivialize   (importance < 0.3): low stakes → downweight conflict
+//   update       (low c + high PE): revise belief toward new evidence
+//
+// Source: Festinger, L. (1957). A theory of cognitive dissonance. Stanford UP.
+// Also covers: self-perception theory, post-decision regret, identity-protective cognition.
+
+interface DissonanceState {
+  score: number;
+  strategy: "rationalize" | "trivialize" | "update" | "none";
+  isActive: boolean;
+}
+
+const DISSONANCE_CUES = [
+  "chose", "decided", "bought", "committed", "invested", "agreed",
+  "belief", "contradict", "inconsist", "hypocris", "conflict",
+  "regret", "second-guess", "doubt", "despite", "although",
+  "justify", "rationalize", "post-decision", "dissonance",
+];
+
+function computeDissonance(situation: Situation): DissonanceState {
+  const { stimulus, person } = situation;
+  const desc = `${stimulus.description} ${stimulus.type}`.toLowerCase();
+
+  const cueHits = DISSONANCE_CUES.filter(c => desc.includes(c)).length;
+  if (cueHits === 0 || stimulus.personalRelevance < 0.3) {
+    return { score: 0, strategy: "none", isActive: false };
+  }
+
+  // D = Σ_{i≠j} |b_i × b_j| × importance
+  // Beliefs are strings; use belief count × personal relevance as proxy magnitude
+  const beliefCount = person.beliefs.length;
+  const pairs = beliefCount > 1 ? (beliefCount * (beliefCount - 1)) / 2 : 1;
+  const score = Math.min(1.0, (cueHits / 5) * stimulus.personalRelevance * Math.min(pairs / 3, 1));
+
+  if (score < 0.1) return { score, strategy: "none", isActive: false };
+
+  // commitment c = history.length / 5, capped at 1.0
+  const commitment = Math.min(1.0, (person.history?.length ?? 0) / 5);
+  const importance = stimulus.personalRelevance;
+
+  const strategy: DissonanceState["strategy"] =
+    commitment > 0.6 ? "rationalize" :
+    importance < 0.3 ? "trivialize"  :
+                       "update";
+
+  return { score, strategy, isActive: true };
+}
+
+// Apply dissonance resolution before domain templates run.
+// Rationalization and trivialization are identity-protective; belief-update is open.
+function applyDissonanceDetector(
+  situation: Situation,
+  response: Response,
+  ds: DissonanceState,
+  maxF: number
+): Response {
+  if (!ds.isActive) return response;
+
+  const commitment = Math.min(1.0, (situation.person.history?.length ?? 0) / 5);
+  let { emotion, behavior, rootCause, process } = response;
+
+  if (ds.strategy === "rationalize") {
+    behavior = "justify-prior-choice";
+    // Rationalization suppresses guilt/anxiety — person feels "right"
+    if (["guilty", "anxious", "embarrassed"].includes(emotion)) emotion = "content";
+    rootCause = `cognitive-dissonance(Festinger:D=${ds.score.toFixed(2)}) → rationalization(commitment=${commitment.toFixed(2)}) | ${rootCause}`;
+    process   = `dissonance:rationalization — high-commitment drives justification of prior behavior | ${process}`;
+  } else if (ds.strategy === "trivialize") {
+    rootCause = `cognitive-dissonance(D=${ds.score.toFixed(2)}) → trivialization(low-importance) | ${rootCause}`;
+    process   = `dissonance:trivialization — low-importance reduces cognitive conflict | ${process}`;
+  } else {
+    // update: low commitment + strong prediction error → revise belief
+    behavior = "update-belief";
+    emotion  = "curious";
+    rootCause = `cognitive-dissonance(D=${ds.score.toFixed(2)}) → belief-change(commitment=${commitment.toFixed(2)},PE=${maxF.toFixed(2)}) | ${rootCause}`;
+    process   = `dissonance:belief-update — low-commitment enables new-evidence integration | ${process}`;
+  }
+
+  return { ...response, emotion, behavior, rootCause, process };
+}
+
 // Threshold above which an attractor basin overrides domain template behavior.
 // Models: habit formation, trauma lock-in, psychopathology rigidity.
 const ATTRACTOR_OVERRIDE_DEPTH = 3.0;
@@ -1005,8 +1091,13 @@ export function predict(situation: Situation): Response {
     confidence,
   };
 
+  // ── Cognitive Dissonance Detector (Festinger 1957) ─────────────────
+  // Short-circuits free-energy pipeline for consistency-relevant stimuli.
+  const dsState = computeDissonance(situation);
+  const dissonanced = applyDissonanceDetector(situation, baseResponse, dsState, maxF);
+
   // Apply domain templates; deep attractors re-assert behavior afterward
-  const templated = applyDomainTemplate(domain, situation, baseResponse);
+  const templated = applyDomainTemplate(domain, situation, dissonanced);
 
   // ── Causal Attribution Spine (Weiner 1985) ─────────────────────────
   // Refine emotion + rootCause using 3D attribution cube.
