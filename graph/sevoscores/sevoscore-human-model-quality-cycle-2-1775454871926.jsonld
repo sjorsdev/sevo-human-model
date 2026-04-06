@@ -1,0 +1,32 @@
+{
+  "@context": "sevo://v1",
+  "@type": "SevoScore",
+  "@id": "sevoscore-human-model-quality-cycle-2-1775454871926",
+  "timestamp": "2026-04-06T05:54:31.934Z",
+  "cycleId": "human-model-quality-cycle-2-1775454871926",
+  "score": 3,
+  "cyclePoints": 0,
+  "breakdown": {
+    "agentsCreated": 3,
+    "agentsImproved": 0,
+    "fitnessEvaluations": 0,
+    "mutationsProposed": 0,
+    "selectionsMade": 0,
+    "noveltysRecorded": 0,
+    "crossoversPerformed": 0,
+    "seedImprovements": 0,
+    "benchmarksEvolved": 0,
+    "improvementBonus": 0
+  },
+  "metadata": {
+    "totalAgents": 3,
+    "activeAgents": 3,
+    "bestAgentId": "agent:model-v3-1775454653855",
+    "bestEqs": 0.4472135954999579,
+    "avgFitness": 0.4472135954999579,
+    "maxBenchmarkDifficulty": 0,
+    "evolvedLoc": 1600,
+    "model": "claude-haiku-4-5",
+    "domain": "Human Model Quality"
+  }
+}
