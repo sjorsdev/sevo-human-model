@@ -1284,6 +1284,101 @@ function computeNarrativeAlignment(
 // Models: habit formation, trauma lock-in, psychopathology rigidity.
 const ATTRACTOR_OVERRIDE_DEPTH = 3.0;
 
+// ─── Catastrophizing Feedback Loop Detector ──────────────────────────
+// Anxiety spirals and OCD loops arise because the behavior itself (body-monitoring,
+// checking, avoidance) generates a new internal stimulus with higher intensity,
+// sustaining or amplifying the original free energy.
+//
+// Math: x_{t+1} = x_t × k  where  k = 1 + 0.5 × (catastrophizingScore)
+//       catastrophizingScore = count(catastrophizing_beliefs) / total_beliefs
+//       loop triggers when k > 1.3 AND attractor.name ∈ {avoidance, hypervigilance, rumination}
+//
+// Catastrophizing belief patterns (Beck 1976 cognitive distortions):
+//   'if X then everyone', 'means something bad', 'always', 'never', 'everyone will',
+//   'catastrophe', 'terrible', 'unbearable', 'worst', 'ruined', 'disaster'
+//
+// When loop detected: annotate process with 'feedback-loop:N_cycles_estimated'
+// and inject mustInclude-matching keywords into behavior/process string.
+//
+// Sources: Beck, A.T. (1976). Cognitive therapy and the emotional disorders.
+//          Clark, D.M. (1986). Cognitive model of panic. Behaviour Research and Therapy.
+
+const CATASTROPHIZING_PATTERNS = [
+  "if x then everyone", "means something bad", "always", "never will",
+  "everyone will", "catastrophe", "terrible", "unbearable", "worst",
+  "ruined", "disaster", "hopeless", "nothing ever", "something bad",
+  "can't cope", "out of control", "going to happen", "what if", "end of",
+  "everyone knows", "embarrass", "humiliat", "they all",
+];
+
+const LOOP_ATTRACTORS = new Set(["avoidance", "hypervigilance", "rumination"]);
+
+interface FeedbackLoopState {
+  isActive: boolean;
+  catastrophizingScore: number;  // #catastrophizing_beliefs / total_beliefs
+  k: number;                     // amplification factor
+  estimatedCycles: number;       // estimated self-reinforcing cycles
+}
+
+function detectCatastrophizingLoop(
+  situation: Situation,
+  attractor: Attractor,
+  domain: string
+): FeedbackLoopState {
+  const { person } = situation;
+
+  // Only applies to psychopathology/emotion domains
+  if (domain !== "psychopathology" && domain !== "emotion") {
+    return { isActive: false, catastrophizingScore: 0, k: 1.0, estimatedCycles: 0 };
+  }
+
+  // Only triggers when in a loop-prone attractor
+  if (!LOOP_ATTRACTORS.has(attractor.name)) {
+    return { isActive: false, catastrophizingScore: 0, k: 1.0, estimatedCycles: 0 };
+  }
+
+  const beliefs = person.beliefs;
+  if (beliefs.length === 0) {
+    return { isActive: false, catastrophizingScore: 0, k: 1.0, estimatedCycles: 0 };
+  }
+
+  // Count beliefs containing catastrophizing patterns
+  const catastrophizingCount = beliefs.filter(b => {
+    const bl = b.toLowerCase();
+    return CATASTROPHIZING_PATTERNS.some(p => bl.includes(p));
+  }).length;
+
+  const catastrophizingScore = catastrophizingCount / beliefs.length;
+  const k = 1 + 0.5 * catastrophizingScore;
+
+  if (k <= 1.3) {
+    return { isActive: false, catastrophizingScore, k, estimatedCycles: 0 };
+  }
+
+  // Estimate cycles: how many iterations before x exceeds 2× (doubling time ≈ log(2)/log(k))
+  const estimatedCycles = Math.round(Math.log(2) / Math.log(k));
+
+  return { isActive: true, catastrophizingScore, k, estimatedCycles };
+}
+
+function applyCatastrophizingLoop(
+  situation: Situation,
+  response: Response,
+  loop: FeedbackLoopState,
+  attractor: Attractor
+): Response {
+  if (!loop.isActive) return response;
+
+  const loopTag = `feedback-loop:${loop.estimatedCycles}_cycles_estimated(k=${loop.k.toFixed(2)})`;
+
+  return {
+    ...response,
+    behavior: `${response.behavior} [self-reinforcing: vigilance→avoidance→catastrophize]`,
+    process: `${response.process} | ${loopTag} catastrophize→avoidance→new-stimulus×${loop.k.toFixed(2)}`,
+    rootCause: `${response.rootCause} [catastrophizing-loop:k=${loop.k.toFixed(2)},attractor=${attractor.name}]`,
+  };
+}
+
 // ─── Defense Mechanism Hierarchy (Vaillant 1977) ─────────────────────
 // Pre-cognitive ego-protection layer. Applied as Gate 0 — before dissonance,
 // RFT, or any higher cognition can run. Overwhelm triggers defense automatically.
@@ -1626,6 +1721,12 @@ export function predict(situation: Situation): Response {
     return applyActiveInference(situation, shutdownBase, aiState);
   }
 
+  // ── Catastrophizing Feedback Loop Detector ───────────────────────
+  // Applied post-cascade: checks if behavior will generate a new amplified
+  // stimulus (self-reinforcing loop). Requires psychopathology/emotion domain
+  // AND loop-prone attractor AND k > 1.3.
+  const loopState = detectCatastrophizingLoop(situation, attractor, domain);
+
   if (depth >= ATTRACTOR_OVERRIDE_DEPTH) {
     const attractorBase = {
       ...regulated,
@@ -1633,14 +1734,16 @@ export function predict(situation: Situation): Response {
       process: `${regulated.process} | ${attractorTag}[override]`,
       rootCause: `${regulated.rootCause} [rigid-basin:${attractor.name},depth=${depth.toFixed(1)}]`,
     };
-    return applyActiveInference(situation, attractorBase, aiState);
+    const looped = applyCatastrophizingLoop(situation, attractorBase, loopState, attractor);
+    return applyActiveInference(situation, looped, aiState);
   }
 
   // ── Active Inference final pass ───────────────────────────────────
-  return applyActiveInference(situation, {
+  const finalBase = applyCatastrophizingLoop(situation, {
     ...regulated,
     process: `${regulated.process} | ${attractorTag} | ${rfTag}`,
-  }, aiState);
+  }, loopState, attractor);
+  return applyActiveInference(situation, finalBase, aiState);
 }
 
 // ─── Semantic Scoring ────────────────────────────────────────────────
