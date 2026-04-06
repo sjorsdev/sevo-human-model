@@ -1,0 +1,10 @@
+{
+  "@context": "sevo://v1",
+  "@type": "Agent",
+  "@id": "agent:social-self-mmnmvbjn7-mmnmvbjnc-mmnmvbjnf-mmnmvd9xc-mmnmvd9xd-mmnmvd9xf-1775460580177",
+  "timestamp": "2026-04-06T07:29:40.177Z",
+  "blueprint": "blueprints/configs/best-gen18.json",
+  "generation": 18,
+  "status": "active",
+  "domain": "human-model-quality"
+}
