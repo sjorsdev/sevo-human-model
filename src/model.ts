@@ -121,6 +121,43 @@ const DOMAIN_PRIORS: Record<string, Record<string, NeedPrior>> = {
   },
 };
 
+// ─── Prospect Theory Value Function (Kahneman & Tversky 1979) ─────────
+// v(Δ) = Δ^α         for Δ ≥ 0  (gains: diminishing sensitivity)
+// v(Δ) = -λ(-Δ)^α   for Δ < 0  (losses: amplified by λ=2.25)
+// α=0.88 (curvature), λ=2.25 (loss aversion ratio)
+// Applied when domain='decision': transforms observed relevance relative to
+// person's hedonic reference point before free energy computation.
+// Explains: loss aversion, status quo bias, endowment effect, sunk cost fallacy.
+// Source: Kahneman, D. & Tversky, A. (1979). Prospect Theory. Econometrica, 47(2), 263–292.
+
+const PT_ALPHA  = 0.88;
+const PT_LAMBDA = 2.25;
+
+function prospectValue(delta: number): number {
+  if (delta >= 0) return Math.pow(delta, PT_ALPHA);
+  return -PT_LAMBDA * Math.pow(-delta, PT_ALPHA);
+}
+
+// Infer hedonic reference point from emotionalState + neuroticism
+// Positive emotional state → higher baseline (gains feel smaller from there)
+// Negative emotional state → lower baseline (losses feel larger from there)
+// Neuroticism shifts baseline down: more loss-sensitive
+function inferReferencePoint(person: Situation["person"]): number {
+  const es = person.emotionalState.toLowerCase();
+  const POSITIVE_STATES = ["happy", "joyful", "excited", "elated", "content", "cheerful", "positive", "calm", "relaxed"];
+  const NEGATIVE_STATES = ["sad", "anxious", "fearful", "angry", "depressed", "negative", "despondent", "hopeless", "guilty", "ashamed", "frustrated"];
+  let base: number;
+  if (POSITIVE_STATES.some(s => es.includes(s))) {
+    base = 0.6;
+  } else if (NEGATIVE_STATES.some(s => es.includes(s))) {
+    base = 0.35;
+  } else {
+    base = 0.5; // neutral
+  }
+  const neuroticism = person.traits["neuroticism"] ?? 0.5;
+  return Math.max(0.05, Math.min(0.95, base - 0.15 * neuroticism));
+}
+
 // Canonical need names — map synonyms to the 8 core needs
 function normalizeNeed(need: string): string {
   const n = need.toLowerCase().trim();
@@ -506,13 +543,13 @@ function decisionTemplate(situation: Situation, response: Response): Response {
 
   if (isLossFrame && !isGainFrame) {
     decisionBehavior = "risk-seeking";
-    ptProcess = "prospect-theory: loss-frame → risk-seeking (λ=2.25, reference-point shift)";
+    ptProcess = "prospect-theory(KT1979): loss-frame → risk-seeking [v(Δ)=-2.25(-Δ)^0.88, loss-aversion-amplified-F]";
   } else if (isGainFrame && !isLossFrame) {
     decisionBehavior = "risk-averse";
-    ptProcess = "prospect-theory: gain-frame → risk-aversion (diminishing marginal utility)";
+    ptProcess = "prospect-theory(KT1979): gain-frame → risk-aversion [v(Δ)=Δ^0.88, diminishing-sensitivity, status-quo-bias]";
   } else {
     decisionBehavior = "deliberate";
-    ptProcess = "prospect-theory: ambiguous frame → deliberation under uncertainty";
+    ptProcess = "prospect-theory(KT1979): ambiguous-frame → deliberation [reference-point-anchored, endowment-effect-active]";
   }
 
   if (context.timeConstraint) {
@@ -1407,6 +1444,13 @@ export function predict(situation: Situation): Response {
 
   const activeNeeds = person.needs.length > 0 ? person.needs : Object.keys(NEED_PRIORS);
 
+  // Prospect Theory gate: when domain='decision', compute hedonic reference point once.
+  // PE is then v(obs − referencePoint) rather than |obs − prior.expected|.
+  // This encodes loss aversion (λ=2.25) and diminishing sensitivity (α=0.88) into
+  // free energy, pushing decision predictions toward loss-avoidance and status quo.
+  const isDecisionDomain = domain === "decision";
+  const decisionReferencePoint = isDecisionDomain ? inferReferencePoint(person) : 0;
+
   for (const need of activeNeeds) {
     const key = normalizeNeed(need);
     // Domain prior takes precedence; fall back to base prior
@@ -1414,7 +1458,11 @@ export function predict(situation: Situation): Response {
     const traitMod = traitPrecisionMod(person.traits, key);
     const vagalMod = precisionMult[key] ?? 1.0; // polyvagal gate
     const scaledPrecision = prior.precision * traitMod * (0.5 + arousal) * vagalMod * precisionScale;
-    const pe = Math.abs(obs - prior.expected);
+    // Prospect Theory value function for decision domain; standard |PE| otherwise.
+    // v(Δ) amplifies losses 2.25× relative to equivalent gains, driving loss aversion.
+    const pe = isDecisionDomain
+      ? Math.abs(prospectValue(obs - decisionReferencePoint))
+      : Math.abs(obs - prior.expected);
     const F = pe * pe * scaledPrecision;
     if (F > maxF) { maxF = F; dominantNeed = need; }
   }
