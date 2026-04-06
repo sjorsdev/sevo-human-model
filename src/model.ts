@@ -420,7 +420,8 @@ function selectAttractor(
   force: [number, number],
   person: Situation["person"],
   narrative?: { agency: number; communion: number },
-  load: number = 0
+  load: number = 0,
+  focusScalar: number = 0
 ): { attractor: Attractor; depth: number } {
   const attractors = DOMAIN_ATTRACTORS[domain] ?? DOMAIN_ATTRACTORS.emotion;
 
@@ -456,6 +457,14 @@ function selectAttractor(
     // Chronic stress history makes threat-avoidance attractors stickier → PTSD/burnout patterns
     if (load > 0 && ALLOSTATIC_LOAD_ATTRACTORS.has(a.name)) {
       depth *= (1 + load);
+    }
+
+    // Regulatory Focus Gate (Higgins 1997): modulate motivation-domain attractor depths
+    // Prevention (focus > 0): deepen avoid-failure, shallow pursue-goal
+    // Promotion (focus < 0): reverse
+    if (domain === "motivation") {
+      if (a.name === "avoid-failure") depth *= Math.max(0.5, 1 + focusScalar);
+      if (a.name === "pursue-goal")   depth *= Math.max(0.5, 1 - focusScalar / 2);
     }
 
     const dx = xF[0] - a.pos[0];
@@ -918,6 +927,48 @@ function applyAttributionSpine(
     emotion: attributionEmotion,
     rootCause: attributionRootCause,
   };
+}
+
+// ─── Regulatory Focus Gate (Higgins 1997) ────────────────────────────
+// Single-axis chronic focus scalar: focus = (C + N)/2 − (E + O)/2
+// Positive = prevention (vigilant, avoid failure); Negative = promotion (eager, pursue goal).
+// Applied to motivation-domain attractor depths before domain template runs:
+//   avoid-failure depth *= max(0.5, 1 + focus)   — prevention deepens avoidance basin
+//   pursue-goal   depth *= max(0.5, 1 − focus/2) — prevention shallows approach basin
+// Emotion asymmetry (Higgins 1997 self-discrepancy theory):
+//   prevention × failure → anxiety/guilt  (ideal-ought discrepancy → agitation)
+//   prevention × success → relief         (safety restored)
+//   promotion  × failure → dejection/disappointment (ideal-self discrepancy → dejection)
+//   promotion  × success → joy/pride      (ideal attained)
+// Source: Higgins, E.T. (1997). Beyond pleasure and pain. American Psychologist, 52(12), 1280–1300.
+
+function computeFocusScalar(traits: Record<string, number>): number {
+  const t = (k: string) => traits[k] ?? 0.5;
+  // prevention: high conscientiousness + neuroticism
+  // promotion:  high extraversion + openness
+  return (t("conscientiousness") + t("neuroticism")) / 2 - (t("extraversion") + t("openness")) / 2;
+}
+
+// Map focus × congruence → differentiated motivational emotion (Higgins 1997)
+function applyFocusEmotion(
+  focusScalar: number,
+  congruence: number,
+  currentEmotion: string,
+  arousal: number
+): string {
+  if (Math.abs(focusScalar) < 0.08) return currentEmotion; // near-neutral: no override
+  const isPrevention = focusScalar > 0;
+  if (congruence > 0) {
+    // Success outcome
+    return isPrevention ? "relieved" : (arousal > 0.5 ? "joy" : "proud");
+  }
+  if (congruence < 0) {
+    // Failure outcome
+    return isPrevention
+      ? (arousal > 0.5 ? "anxious" : "guilty")
+      : (arousal > 0.5 ? "dejected" : "disappointed");
+  }
+  return currentEmotion;
 }
 
 // ─── Regulatory Focus Theory (Higgins 1997) ──────────────────────────
@@ -1696,6 +1747,11 @@ export function predict(situation: Situation): Response {
     allostaticLoad
   );
 
+  // ── Regulatory Focus Gate (Higgins 1997) ─────────────────────────
+  // Chronic focus scalar: positive = prevention, negative = promotion.
+  // Modulates motivation attractor depths and emotion signatures downstream.
+  const focusScalar = computeFocusScalar(person.traits);
+
   // Build priors from person's needs (fall back to generic prior)
   // Person-level precision (from active inference) scales all need precisions.
   // High global precision → amplifies need-space F (more urgency); low → dampens.
@@ -1745,7 +1801,12 @@ export function predict(situation: Situation): Response {
     ? 0.0
     : conscientiousness * (1 - Math.max(0, Math.min(0.5, arousal - 0.5)) * 2);
   const certainty = 1 - stimulus.novelty;
-  const emotion = appraise(dominantNeed, congruence, copingPotential, certainty);
+  const appraised = appraise(dominantNeed, congruence, copingPotential, certainty);
+  // Regulatory Focus emotion override for motivation domain (Higgins 1997):
+  // prevention failure → anxiety/guilt; promotion failure → dejection/disappointment
+  const emotion = domain === "motivation"
+    ? applyFocusEmotion(focusScalar, congruence, appraised, arousal)
+    : appraised;
 
   // Behavior: minimize free energy (initial pass — may be overridden by attractor)
   let behavior: string;
@@ -1770,7 +1831,7 @@ export function predict(situation: Situation): Response {
   // Deep basins (trauma, habit, pathology) override behavior regardless of stimulus.
   const personPos = emotionalStateToPos(person.emotionalState, arousal);
   const force = computeForce(situation);
-  const { attractor, depth } = selectAttractor(domain, personPos, force, person, narrative, allostaticLoad);
+  const { attractor, depth } = selectAttractor(domain, personPos, force, person, narrative, allostaticLoad, focusScalar);
 
   // Deep attractors override behavior — willpower insufficient against deep basin
   if (depth >= ATTRACTOR_OVERRIDE_DEPTH) {
