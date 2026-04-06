@@ -1225,6 +1225,32 @@ function computeNarrativeAlignment(
 // Models: habit formation, trauma lock-in, psychopathology rigidity.
 const ATTRACTOR_OVERRIDE_DEPTH = 3.0;
 
+// ─── Mechanism Precedence Cascade with Veto Gates ─────────────────────
+// Layers compose via strict precedence fold rather than democratic voting:
+// f_cascade(s) = fold(layers, s, (acc, layer) →
+//   layer.veto(acc) ? force_veto_output(acc) : layer.apply(acc + acc.residue))
+//
+// Gate 1 — Polyvagal SHUTDOWN (threshold: SHUTDOWN state):
+//   vetoes ALL higher cognition → freeze/withdrawal; residue={safetyBoost:1.0}
+// Gate 2 — Dissonance D > 0.7 (DISSONANCE_VETO_THRESHOLD):
+//   suspends RFT → resolution-seeking supersedes goal pursuit; residue={conflictLoad:score}
+// Gate 3 — Narrative alignment < 0.35 (NARRATIVE_THREAT_THRESHOLD):
+//   identity threat overrides momentary need hierarchy → protect self-story; residue={identityThreat:1-alignment}
+//
+// Residue: each veto emits a numeric perturbation that downstream layers add to their priors,
+// so even vetoed signals leave a trace in the final output.
+// Sources: Porges (1994), Festinger (1957), McAdams (1993)
+
+interface CascadeState {
+  response: Response;
+  vetoSignal: number;              // 0 = pass-through; >0 = active veto
+  residue: Record<string, number>; // downstream prior perturbation
+  vetoedBy?: string;
+}
+
+const DISSONANCE_VETO_THRESHOLD  = 0.7;  // D above this suspends RFT
+const NARRATIVE_THREAT_THRESHOLD = 0.35; // alignment below this = identity threat
+
 export function predict(situation: Situation): Response {
   const { person, stimulus } = situation;
   const obs = stimulus.personalRelevance; // 0–1 observation
@@ -1333,42 +1359,94 @@ export function predict(situation: Situation): Response {
     confidence,
   };
 
-  // ── Cognitive Dissonance Detector (Festinger 1957) ─────────────────
-  // Short-circuits free-energy pipeline for consistency-relevant stimuli.
-  const dsState = computeDissonance(situation);
-  const dissonanced = applyDissonanceDetector(situation, baseResponse, dsState, maxF);
+  // ─── Mechanism Precedence Cascade ────────────────────────────────────
+  // Each gate accumulates residue that perturbs downstream layer priors.
+  const cascadeResidue: Record<string, number> = {};
 
-  // Apply domain templates; deep attractors re-assert behavior afterward
+  // ── Cascade Gate 2: Dissonance Veto (Festinger 1957) ───────────────
+  // D > 0.7: unresolved contradiction suspends regulatory goal pursuit.
+  // The mind cannot run promotion/prevention strategy while resolving contradiction.
+  const dsState = computeDissonance(situation);
+  const dissonanceVeto = dsState.score > DISSONANCE_VETO_THRESHOLD;
+  if (dissonanceVeto) {
+    cascadeResidue["conflictLoad"] = dsState.score;
+  }
+
+  // Dissonance residue boosts effective FE signal for resolution-seeking behavior.
+  const dissonanced = applyDissonanceDetector(
+    situation, baseResponse, dsState,
+    maxF + (cascadeResidue["conflictLoad"] ?? 0) * 0.5
+  );
+
+  // Apply domain templates
   const templated = applyDomainTemplate(domain, situation, dissonanced);
 
   // ── Causal Attribution Spine (Weiner 1985) ─────────────────────────
-  // Refine emotion + rootCause using 3D attribution cube.
-  // FE magnitude (maxF) scales attribution signal strength.
   const attributed = applyAttributionSpine(situation, templated, maxF);
 
-  // ── Regulatory Focus Theory Filter (Higgins 1997) ─────────────────
-  // 2-axis motivational spine: promotion × prevention focus modulates
-  // emotion valence and approach/avoidance behavior.
+  // ── Cascade Gate 3: Narrative Identity Threat (McAdams 1993) ───────
+  // If dominant attractor misaligns with self-story (alignment < 0.35),
+  // person sacrifices momentary need satisfaction to protect narrative identity.
+  // This overrides need hierarchy before RFT can apply motivational coloring.
+  const narrativeAlignment = computeNarrativeAlignment(attractor.name, narrative);
+  const narrativeThreat = narrativeAlignment < NARRATIVE_THREAT_THRESHOLD &&
+    (person.history?.length ?? 0) > 0;
+  if (narrativeThreat) {
+    cascadeResidue["identityThreat"] = 1 - narrativeAlignment;
+  }
+
+  let narrativeAdjusted = attributed;
+  if (narrativeThreat) {
+    // Agency-dominant identity → assert self; communion-dominant → seek belonging
+    const identityBehavior = narrative.agency >= narrative.communion
+      ? "assert-identity"
+      : "seek-belonging";
+    narrativeAdjusted = {
+      ...attributed,
+      behavior: identityBehavior,
+      rootCause: `${attributed.rootCause} [cascade:narrative-threat(A=${narrativeAlignment.toFixed(2)})→${identityBehavior}]`,
+      process: `${attributed.process} | cascade:narrative-veto(identityThreat=${cascadeResidue["identityThreat"]?.toFixed(2)})`,
+    };
+  }
+
+  // ── Regulatory Focus Theory — gated by dissonance veto ─────────────
+  // Gate 2 active: D > 0.7 means RFT suspended; resolution-seeking takes precedence.
+  // Gate 2 inactive: RFT runs normally to add motivational coloring.
   const rfState = computeRegulatoryFocus(situation);
-  const regulated = applyRegulatoryFocus(situation, attributed, rfState);
+  let regulated: Response;
+  if (dissonanceVeto) {
+    const resolutionBehavior =
+      dsState.strategy === "rationalize" ? "justify-prior-choice"
+      : dsState.strategy === "update"    ? "seek-resolution"
+      : "contain-conflict";
+    regulated = {
+      ...narrativeAdjusted,
+      behavior: resolutionBehavior,
+      rootCause: `${narrativeAdjusted.rootCause} [cascade:dissonance-veto(D=${dsState.score.toFixed(2)})→resolution-first]`,
+      process: `${narrativeAdjusted.process} | cascade:dissonance-veto suspends RFT(pressure=${rfState.pressure.toFixed(2)})`,
+    };
+  } else {
+    regulated = applyRegulatoryFocus(situation, narrativeAdjusted, rfState);
+  }
   const rfTag = `RFT:${rfState.strategy}(p=${rfState.pressure.toFixed(2)})`;
 
-  // ── Polyvagal SHUTDOWN override ───────────────────────────────────
-  // Dorsal vagal collapse: no deep esteem/autonomy attractor can fire.
-  // Behavior forced to freeze or withdrawal regardless of domain template.
+  // ── Cascade Gate 1: Polyvagal SHUTDOWN Veto (Porges 1994) ──────────
+  // SHUTDOWN vetoes ALL higher cognition — narrative, dissonance, and RFT outputs
+  // are all overridden. Dorsal vagal collapse forces freeze/withdrawal unconditionally.
+  // Residue: safetyBoost=1.0 passed to active inference (confirms survival-only output).
   if (autonomicState === "SHUTDOWN") {
     const shutdownBehavior = arousal > 0.85 ? "freeze" : "withdrawal";
+    cascadeResidue["safetyBoost"] = 1.0;
     const shutdownBase = {
       ...regulated,
       behavior: shutdownBehavior,
-      process: `${regulated.process} | ${vagalTag}→${shutdownBehavior}`,
-      rootCause: `${regulated.rootCause} [polyvagal:SHUTDOWN — dorsal-vagal collapse, safety-only processing]`,
+      process: `${regulated.process} | cascade:SHUTDOWN-veto→${shutdownBehavior}(residue:safety+1.0)`,
+      rootCause: `${regulated.rootCause} [cascade:SHUTDOWN-veto — dorsal-vagal collapse, safety-only]`,
     };
     return applyActiveInference(situation, shutdownBase, aiState);
   }
 
   if (depth >= ATTRACTOR_OVERRIDE_DEPTH) {
-    // Pathological/habitual rigidity: template refines rootCause/process, attractor locks behavior
     const attractorBase = {
       ...regulated,
       behavior: attractor.name,
@@ -1379,8 +1457,6 @@ export function predict(situation: Situation): Response {
   }
 
   // ── Active Inference final pass ───────────────────────────────────
-  // Primary driver: precision gates belief updates vs. active behavior.
-  // Clinical predictions: high-π (OCD/PTSD) → rigid; low-π (mania) → fluid.
   return applyActiveInference(situation, {
     ...regulated,
     process: `${regulated.process} | ${attractorTag} | ${rfTag}`,
