@@ -41,21 +41,39 @@ Benchmarks in `benchmarks/` are ground truth — known psychological phenomena:
 
 8 domains: cognitive-bias, emotion, social, decision, development, personality, psychopathology, motivation.
 
-## How Evolution Works
+## How Evolution Works — Two Levels
 
-The **sevo orchestrator** runs `REFLECT → THINK → IMPLEMENT → TEST → REALIGN` cycles on this project.
+### Level 1: Model Competition (fork-runner)
+Multiple competing models live in `blueprints/model-v*.ts`. The **fork-runner** scores all models, mutates the best, generates new paradigms, archives the worst.
+
+```bash
+deno run --allow-all src/fork-runner.ts
+```
+
+- Each blueprint is a self-contained model: `predict(situation) → response`
+- Blueprints are scored by running `deno run --allow-read blueprints/model-vN.ts`
+- Best model gets mutated → child competes with parent
+- Every 3 cycles: a completely new paradigm is generated from scratch
+- Population grows/shrinks between 3 and 10 competing models
+
+### Level 2: Engine Evolution (orchestrator)
+The **sevo orchestrator** evolves the engine itself — scoring logic, types, evaluation, infrastructure.
+
+```bash
+deno run --allow-all ../sevo/src/orchestrator.ts .
+```
 
 - **REFLECT**: Analyze fitness history, detect plateaus
-- **THINK**: Creative reasoning about what the model is missing
-- **IMPLEMENT**: Modify `src/model.ts` (or any src file) on a branch
-- **TEST**: Run `deno run --allow-read src/model.ts` — must output fitness JSON
-- **REALIGN**: Check if we're still serving the goal
+- **THINK**: Creative reasoning about what's missing
+- **IMPLEMENT**: Modify any `src/` file on a branch
+- **TEST**: Verify changes work
+- **REALIGN**: Check goal alignment
 
-The orchestrator can modify ANY src file. It should primarily evolve `src/model.ts`. The model's internal structure, logic, and representation are all evolvable.
+Both levels run independently. The orchestrator improves HOW models are evaluated. The fork-runner improves WHICH model wins.
 
 ## Evaluation
 
-Running `src/model.ts` directly:
+Running any blueprint directly:
 1. Loads all benchmarks from `benchmarks/`
 2. Calls `predict(situation)` for each
 3. Outputs `{ fitness, predictions }` as JSON on stdout
