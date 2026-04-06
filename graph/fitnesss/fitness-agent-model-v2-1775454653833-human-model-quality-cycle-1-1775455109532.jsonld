@@ -1,0 +1,37 @@
+{
+  "@context": "sevo://v1",
+  "@type": "Fitness",
+  "@id": "fitness-agent-model-v2-1775454653833-human-model-quality-cycle-1-1775455109532",
+  "timestamp": "2026-04-06T05:59:09.426Z",
+  "agent": "agent:model-v2-1775454653833",
+  "eqs": 0.04067407111768381,
+  "accuracy": 0,
+  "magnitude": 0,
+  "branchesExplored": 1,
+  "predictionError": 1,
+  "cycleId": "human-model-quality-cycle-1-1775455109532",
+  "context": {
+    "fitness": 0.10168517779420953,
+    "accuracy": 0.56,
+    "coverage": 0.63,
+    "coherence": 0.706,
+    "primitiveCount": 6,
+    "strengths": [
+      "Core principle (minimize prediction error) is simple and unified",
+      "Strong explanatory fit for emotion/psychopathology phenomena (Fear, Anxiety Loop, Addiction, Grief)",
+      "Clear causal mechanism: predict → error-signal → model-updater → predict",
+      "Reasonably compact (6 primitives for 18 benchmarks across 8 domains)"
+    ],
+    "weaknesses": [
+      "**Self-contradiction**: Sunk Cost prediction ('discounts disconfirming information') directly violates the stated principle—a prediction-error minimizer should UPDATE faster when error detected, not protect failed predictions",
+      "**Generic output collapse**: Only 4 distinct response patterns across 18 phenomena; benchmarks like Asch + Bystander + Anchoring + Choice Overload all map to 'partially updates beliefs while cautiously acting'—loss of discriminative power",
+      "**Missing mechanistic depth on cognitive biases**: Model doesn't explain *why* biases are systematic (e.g., why loss asymmetry, why sunk cost is sticky, why choice overload paralyzes). Treats errors as generic noise rather than structured misrepresentation",
+      "**Choice Overload (Jam Study) prediction is inert**: Doesn't address why more information → paralysis, not better decisions. Prediction-error logic suggests more data aids updating, not freezes it",
+      "**Emotions are decorative**: Emotion assignments (shame, anxiety, distress, mild-surprise) don't follow logically from prediction-error mechanisms; appear post-hoc",
+      "**Missing social/developmental foundations**: No explanation for *why* certain predictions form (e.g., why does group opinion override visual evidence in Asch?). Requires hidden assumptions about social hierarchy, attachment, or learning history",
+      "**Hidden assumptions**: Loss asymmetry, computational constraints, and conformity pressure are not in the declared primitives but needed to explain predictions"
+    ],
+    "modelName": "The Prediction Engine",
+    "benchmarkCount": 18
+  }
+}
