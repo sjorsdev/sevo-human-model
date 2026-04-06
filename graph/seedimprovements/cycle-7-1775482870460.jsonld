@@ -1,0 +1,13 @@
+{
+  "@context": "sevo://v1",
+  "@type": "SeedImprovement",
+  "@id": "cycle-7-1775482870460",
+  "timestamp": "2026-04-06T13:41:10.460Z",
+  "observation": "Cycle 7: 2 models, best=0.238 (blueprints/model-v1.ts), weakness: Model lacks sufficient internal mechanisms to map situations to accurate behavio",
+  "suggestion": "Improve: Model lacks sufficient internal mechanisms to map situations to accurate behavioral/emotional responses—too few variable",
+  "evidence": [
+    "cycle:7",
+    "population:2"
+  ],
+  "priority": 5
+}
