@@ -1,0 +1,10 @@
+{
+  "@context": "sevo://v1",
+  "@type": "Agent",
+  "@id": "agent:prediction-engine-mmnmw3jbn-mmnmw3jby-mmnmw45x8-mmnmw45xe-mmnmw563c-mmnmw563f-mmnmw61b6-mmnmw61bc-mmnmw6ngm-mmnmw73iw-mmnmw97ey-mmnmw97f0-1775462061570",
+  "timestamp": "2026-04-06T07:54:21.570Z",
+  "blueprint": "blueprints/configs/best-gen50.json",
+  "generation": 50,
+  "status": "active",
+  "domain": "human-model-quality"
+}
