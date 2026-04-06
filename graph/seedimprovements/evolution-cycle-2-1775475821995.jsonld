@@ -1,0 +1,14 @@
+{
+  "@context": "sevo://v1",
+  "@type": "SeedImprovement",
+  "@id": "evolution-cycle-2-1775475821995",
+  "timestamp": "2026-04-06T11:43:41.995Z",
+  "observation": "Cycle 2: 1 models, best=0.238, weakness: **The model lacks outcome feedback loops.** It predicts a response but has no mechanism to learn whe",
+  "suggestion": "Focus on: **The model lacks outcome feedback loops.** It predicts a response but has no mechanism to learn whether that response worked, failed, or changed the ",
+  "evidence": [
+    "cycle:2",
+    "best-fitness:0.238",
+    "population:1"
+  ],
+  "priority": 5
+}
