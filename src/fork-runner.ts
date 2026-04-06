@@ -9,6 +9,7 @@
 
 import { queryNodes, writeNode } from "./graph.ts";
 import { git } from "./git.ts";
+import { reportDiscovery } from "./reporter.ts";
 import type { AgentNode, SeedImprovementNode } from "./types.ts";
 
 const CYCLES = 5;
@@ -35,6 +36,33 @@ async function callClaude(prompt: string, model = "sonnet"): Promise<string> {
     }
   }
   throw new Error("callClaude failed after 3 attempts");
+}
+
+async function callClaudeWithFileAccess(prompt: string): Promise<string> {
+  const claudePath = `${Deno.env.get("HOME")}/.local/bin/claude`;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const cmd = new Deno.Command(claudePath, {
+        args: [
+          "-p", prompt,
+          "--output-format", "text",
+          "--model", "sonnet",
+          "--max-turns", "3",
+          "--add-dir", ".",
+          "--allowedTools", "Read,Glob",
+        ],
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const result = await cmd.output();
+      const stdout = new TextDecoder().decode(result.stdout).trim();
+      if (result.success && stdout) return stdout;
+      if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 15000));
+    } catch {
+      if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 15000));
+    }
+  }
+  throw new Error("callClaudeWithFileAccess failed after 3 attempts");
 }
 
 // ─── Run a blueprint and get its fitness ─────────────────────────────
@@ -81,40 +109,29 @@ async function mutateBlueprint(
   fitness: number,
   weaknesses: string,
 ): Promise<string | null> {
-  const source = await Deno.readTextFile(sourcePath);
-
-  // Send a focused mutation prompt — only the relevant parts
+  // Don't send full source — let Claude read the file itself
   const prompt = `You are evolving a computational model of human psychology.
+The model is at ${sourcePath} — read it first.
 
-This model scores fitness=${fitness.toFixed(3)} on 18 psychology benchmarks.
-The model's weakness: ${weaknesses.slice(0, 300)}
+Fitness: ${fitness.toFixed(3)} on 18 psychology benchmarks.
+Weakness: ${weaknesses.slice(0, 300)}
 
-Read the model below and make ONE meaningful improvement:
-- Fix a specific weakness
-- Add a missing mechanism
-- Improve how predictions are generated
-- Make the model handle a domain it currently fails on
+Make ONE meaningful improvement to fix the weakness.
 
 IMPORTANT:
-- Output the COMPLETE TypeScript file
-- It must work as: deno run --allow-read blueprints/model-vN.ts
-- It must output JSON on stdout: { fitness: number, predictions: number }
-- Keep the evaluate() function and loadBenchmarks() at the bottom
+- Output the COMPLETE updated TypeScript file in a code block
+- Must run as: deno run --allow-read blueprints/model-vN.ts
+- Must output JSON on stdout: { fitness, predictions }
+- Keep evaluate() and loadBenchmarks() at the bottom
 - Import from "../src/human-types.ts"
 
-Current model (${source.length} chars):
-\`\`\`typescript
-${source.slice(0, 12000)}
-\`\`\`
-${source.length > 12000 ? `\n... (${source.length - 12000} chars truncated)` : ""}
-
-Output the complete improved file in a code block.`;
+Read the file, then output the complete improved version.`;
 
   try {
-    const response = await callClaude(prompt);
+    const response = await callClaudeWithFileAccess(prompt);
     const match = response.match(/```(?:typescript|ts)?\s*\n([\s\S]*?)```/);
     const code = match ? match[1].trim() : null;
-    if (!code || !code.includes("export function predict") || !code.includes("evaluate")) {
+    if (!code || !code.includes("predict") || !code.includes("evaluate")) {
       console.log("    Mutation: invalid output (missing predict or evaluate)");
       return null;
     }
@@ -150,7 +167,7 @@ Think about novel paradigms:
 Output a COMPLETE TypeScript file in a code block. Include the scoreBenchmark function and evaluate harness.`;
 
   try {
-    const response = await callClaude(prompt);
+    const response = await callClaudeWithFileAccess(prompt);
     const match = response.match(/```(?:typescript|ts)?\s*\n([\s\S]*?)```/);
     const code = match ? match[1].trim() : null;
     if (!code || !code.includes("predict") || !code.includes("evaluate")) return null;
@@ -306,6 +323,15 @@ async function runCycle(cycle: number): Promise<void> {
     await git.add("blueprints/");
     await git.commit(`archive: ${worst.path} fitness=${worst.fitness.toFixed(3)}`);
   }
+
+  // Report to sevoagents.com
+  reportDiscovery("eqs_milestone", {
+    cycle,
+    population: results.length,
+    bestFitness: best.fitness,
+    bestModel: best.path,
+    weakness: weakness.slice(0, 200),
+  }, "human-model-quality");
 
   // Record learning
   const learning: SeedImprovementNode = {
