@@ -1,0 +1,39 @@
+{
+  "@context": "sevo://v1",
+  "@type": "Fitness",
+  "@id": "fitness-agent-model-v1-1775454653874-human-model-quality-cycle-3-1775455770044",
+  "timestamp": "2026-04-06T06:10:24.474Z",
+  "agent": "agent:model-v1-1775454653874",
+  "eqs": 0.008669597896096452,
+  "accuracy": 0,
+  "magnitude": 0,
+  "branchesExplored": 1,
+  "predictionError": 1,
+  "cycleId": "human-model-quality-cycle-3-1775455770044",
+  "context": {
+    "fitness": 0.021673994740241127,
+    "accuracy": 0.32,
+    "coverage": 0.28,
+    "coherence": 0.64,
+    "primitiveCount": 7,
+    "strengths": [
+      "Simple, memorable primitives (3 drives) create initial elegance",
+      "Correctly captures fear-response (0.9) and partially handles attachment/conformity/emotional contagion",
+      "Clear hierarchical structure: appraisal → drive activation → response pattern",
+      "Safety-drive predictions work well for acute threat scenarios"
+    ],
+    "weaknesses": [
+      "Catastrophic failures on cognitive biases: Anchoring Effect (0.1), Sunk Cost (0.1), Confirmation Bias (0.2) — these are NOT drive-based, they're computational/attentional biases. The model has no primitives for heuristics, memory, or automatic adjustment failures.",
+      "Decision-making collapsed: Loss Aversion (0.1) is the opposite of predicted 'mastery-seeking.' Choice Overload (0.1) predicts engagement when humans actually freeze. Framing Effect (0.3) is loss-aversion not fear.",
+      "Addiction (0.1) attributed to safety-drive avoidance — actually cue-triggered reward dopamine. Overjustification Effect (0.1) has nothing to do with belonging.",
+      "Introversion (0.2) wildly wrong — attributed to belonging-drive when it's arousal/stimulation preference. Misses stable trait basis.",
+      "Only 5/18 benchmarks scored ≥0.5: Fear Response, Anxious Attachment, Asch, Emotional Contagion, Anxiety Loop. 7/18 scored ≤0.2.",
+      "POOR DISCRIMINATIVE POWER — model predicts similar response patterns across wildly different phenomena (fear-freeze for both addiction AND sunk cost AND grief). Indicates the framework is too coarse.",
+      "Missing critical primitives: (a) cognitive heuristics/biases layer, (b) reward/dopamine system, (c) learning/memory, (d) attention mechanisms, (e) individual differences, (f) temporal discounting",
+      "The 'appraisal' primitive is declared but never appears in explanations — effectively unused.",
+      "Coherence is shallow: three drives feel unified, but they cannot compose to explain phenomena that require interaction of multiple cognitive systems (not just drives)."
+    ],
+    "modelName": "The Drive Machine",
+    "benchmarkCount": 18
+  }
+}
