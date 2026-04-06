@@ -1,0 +1,14 @@
+{
+  "@context": "sevo://v1",
+  "@type": "SeedImprovement",
+  "@id": "evolution-cycle-4-1775478275593",
+  "timestamp": "2026-04-06T12:24:35.593Z",
+  "observation": "Cycle 4: 1 models, best=0.238, weakness: The model assumes **ALL behavior is surprise minimization (active inference)**, but humans are funda",
+  "suggestion": "Focus on: The model assumes **ALL behavior is surprise minimization (active inference)**, but humans are fundamentally driven by **reward-seeking and approach m",
+  "evidence": [
+    "cycle:4",
+    "best-fitness:0.238",
+    "population:1"
+  ],
+  "priority": 5
+}
