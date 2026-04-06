@@ -1247,11 +1247,113 @@ function computeNarrativeAlignment(
 // Models: habit formation, trauma lock-in, psychopathology rigidity.
 const ATTRACTOR_OVERRIDE_DEPTH = 3.0;
 
+// ─── Defense Mechanism Hierarchy (Vaillant 1977) ─────────────────────
+// Pre-cognitive ego-protection layer. Applied as Gate 0 — before dissonance,
+// RFT, or any higher cognition can run. Overwhelm triggers defense automatically.
+//
+// overwhelm = (intensity × personalRelevance) / copingCapacity
+// copingCapacity = 0.3 + C×0.4 + (1−N)×0.3
+// defenseActive  = overwhelm > 0.9
+// defenseLevel   = overwhelm > 1.2 ? (N > 0.7 ? 'immature' : 'neurotic') : 'mature'
+//
+// Tier mapping (Vaillant 1977):
+//   immature  (N ≥ 0.7): denial, projection, splitting
+//   neurotic  (0.4 ≤ N < 0.7): repression, displacement, reaction-formation
+//   mature    (N < 0.4): sublimation, humor
+//
+// Special case: grief/loss stimuli → denial at ALL neurotic/immature levels
+// (Kübler-Ross stage 1; universally first response regardless of neuroticism tier)
+//
+// Source: Vaillant, G.E. (1977). Adaptation to life. Little, Brown.
+
+interface DefenseState {
+  overwhelm: number;
+  level: "immature" | "neurotic" | "mature";
+  mechanism: string;   // e.g., 'denial', 'repression', 'sublimation'
+  isActive: boolean;   // overwhelm > 0.9
+}
+
+const DEFENSE_EMOTION: Record<string, string> = {
+  denial:               "numb",
+  projection:           "angry",
+  splitting:            "confused",
+  repression:           "calm",
+  displacement:         "irritated",
+  "reaction-formation": "content",
+  sublimation:          "content",
+  humor:                "amused",
+};
+
+const LOSS_GRIEF_CUES = ["loss", "grief", "death", "dying", "mourn", "bereavement",
+                          "died", "funeral", "deceased", "passing", "lost someone"];
+
+function computeDefense(situation: Situation, rawEmotion: string): DefenseState {
+  const { person, stimulus } = situation;
+  const N = person.traits["neuroticism"]       ?? 0.5;
+  const C = person.traits["conscientiousness"] ?? 0.5;
+
+  const copingCapacity = 0.3 + C * 0.4 + (1 - N) * 0.3;
+  const overwhelm = (stimulus.intensity * stimulus.personalRelevance) / Math.max(copingCapacity, 0.1);
+
+  if (overwhelm <= 0.9) {
+    return { overwhelm, level: "mature", mechanism: "none", isActive: false };
+  }
+
+  const level: DefenseState["level"] =
+    overwhelm > 1.2 ? (N > 0.7 ? "immature" : "neurotic") : "mature";
+
+  // Grief/loss → denial across all non-mature levels (Kübler-Ross first stage)
+  const desc = `${stimulus.type} ${stimulus.description}`.toLowerCase();
+  const isLoss = LOSS_GRIEF_CUES.some(c => desc.includes(c));
+
+  let mechanism: string;
+  if (level === "immature") {
+    mechanism = isLoss           ? "denial"
+              : rawEmotion === "angry" ? "projection"
+              : "denial";
+  } else if (level === "neurotic") {
+    mechanism = isLoss           ? "denial"       // grief → denial universally
+              : rawEmotion === "angry" ? "displacement"
+              : "repression";
+  } else {
+    // mature defense: low overwhelm, healthy coping
+    mechanism = rawEmotion === "angry" ? "humor" : "sublimation";
+  }
+
+  return { overwhelm, level, mechanism, isActive: true };
+}
+
+function applyDefense(
+  situation: Situation,
+  response: Response,
+  defense: DefenseState
+): Response {
+  if (!defense.isActive) return response;
+
+  const N = situation.person.traits["neuroticism"] ?? 0.5;
+  const defendedEmotion = DEFENSE_EMOTION[defense.mechanism] ?? response.emotion;
+
+  let behavior = response.behavior;
+  if (defense.mechanism === "denial")     behavior = "denial";
+  else if (defense.mechanism === "projection") behavior = "externalize-blame";
+  else if (defense.mechanism === "sublimation") behavior = "sublimate";
+
+  return {
+    ...response,
+    emotion: defendedEmotion,
+    behavior,
+    rootCause: `defense:${defense.mechanism}(Vaillant:overwhelm=${defense.overwhelm.toFixed(2)},N=${N.toFixed(2)},level=${defense.level}) — ego-protection | ${response.rootCause}`,
+    process: `${response.process} | defense-gate0:${defense.level}(${defense.mechanism}→${defendedEmotion})`,
+  };
+}
+
 // ─── Mechanism Precedence Cascade with Veto Gates ─────────────────────
 // Layers compose via strict precedence fold rather than democratic voting:
 // f_cascade(s) = fold(layers, s, (acc, layer) →
 //   layer.veto(acc) ? force_veto_output(acc) : layer.apply(acc + acc.residue))
 //
+// Gate 0 — Defense Mechanism (threshold: overwhelm > 0.9, Vaillant 1977):
+//   pre-cognitive ego-protection; transforms emotion before any cognition runs
 // Gate 1 — Polyvagal SHUTDOWN (threshold: SHUTDOWN state):
 //   vetoes ALL higher cognition → freeze/withdrawal; residue={safetyBoost:1.0}
 // Gate 2 — Dissonance D > 0.7 (DISSONANCE_VETO_THRESHOLD):
@@ -1261,7 +1363,7 @@ const ATTRACTOR_OVERRIDE_DEPTH = 3.0;
 //
 // Residue: each veto emits a numeric perturbation that downstream layers add to their priors,
 // so even vetoed signals leave a trace in the final output.
-// Sources: Porges (1994), Festinger (1957), McAdams (1993)
+// Sources: Vaillant (1977), Porges (1994), Festinger (1957), McAdams (1993)
 
 interface CascadeState {
   response: Response;
@@ -1385,6 +1487,14 @@ export function predict(situation: Situation): Response {
   // Each gate accumulates residue that perturbs downstream layer priors.
   const cascadeResidue: Record<string, number> = {};
 
+  // ── Cascade Gate 0: Defense Mechanism Hierarchy (Vaillant 1977) ─────
+  // Pre-cognitive ego-protection. Transforms emotion before any cognition runs.
+  // Overwhelm = intensity × personalRelevance / copingCapacity.
+  // When overwhelm > 0.9: defense activates; emotion → defended emotion.
+  // Sits between polyvagal (autonomic) and dissonance (cognitive) — pre-cognitive.
+  const defense = computeDefense(situation, baseResponse.emotion);
+  const defended = applyDefense(situation, baseResponse, defense);
+
   // ── Cascade Gate 2: Dissonance Veto (Festinger 1957) ───────────────
   // D > 0.7: unresolved contradiction suspends regulatory goal pursuit.
   // The mind cannot run promotion/prevention strategy while resolving contradiction.
@@ -1396,7 +1506,7 @@ export function predict(situation: Situation): Response {
 
   // Dissonance residue boosts effective FE signal for resolution-seeking behavior.
   const dissonanced = applyDissonanceDetector(
-    situation, baseResponse, dsState,
+    situation, defended, dsState,
     maxF + (cascadeResidue["conflictLoad"] ?? 0) * 0.5
   );
 
