@@ -219,6 +219,31 @@ function inferDomain(situation: Situation): string {
 const THREAT_STIMULI = new Set(["threat", "loss", "rejection", "failure", "danger", "conflict", "criticism"]);
 const GAIN_STIMULI   = new Set(["reward", "success", "praise", "opportunity", "connection", "discovery", "achievement"]);
 
+// ─── Allostatic Load Scaling (McEwen 1998) ────────────────────────────
+// Accumulated stress burden from repeated threat exposure in history.
+// load = clamp(threatEvents / 5, 0, 1)
+// Downstream effects:
+//   (1) safety need precision × (1 + 2·load)  — hair-trigger threat detection
+//   (2) avoidance/rumination/hypervigilance attractor depth × (1 + load)  — deeper trauma basins
+//   (3) MOBILIZED arousal threshold = 0.4 − 0.2·load  — activates at lower arousal under load
+// Unifies PTSD, burnout, chronic anxiety from one formula applied to existing history[].
+// Source: McEwen, B.S. (1998). Protective and damaging effects of stress mediators. NEJM, 338, 171–179.
+
+const ALLOSTATIC_THREAT_KEYWORDS = [
+  "threat", "danger", "trauma", "abuse", "attack", "violence", "loss",
+  "rejection", "failure", "fear", "panic", "crisis", "stress", "harm",
+  "accident", "death", "grief", "hurt", "pain", "assault", "disaster",
+];
+
+function computeAllostaticLoad(history: string[]): number {
+  if (!history || history.length === 0) return 0;
+  const threatCount = history.filter(h => {
+    const hl = h.toLowerCase();
+    return ALLOSTATIC_THREAT_KEYWORDS.some(k => hl.includes(k));
+  }).length;
+  return Math.min(1, threatCount / 5);
+}
+
 // ─── Polyvagal Gate (Porges 1994) ────────────────────────────────────
 // Autonomic state pre-filters which needs are reachable before active inference.
 // Three circuits map to Porges' three vagal pathways:
@@ -226,8 +251,9 @@ const GAIN_STIMULI   = new Set(["reward", "success", "praise", "opportunity", "c
 //   MOBILIZED → sympathetic: safety/esteem/fairness amplified ×2, others dampened
 //   SHUTDOWN  → dorsal vagal: collapse all needs to safety ×5, behavior forced to withdrawal/freeze
 //
-// Math: autonomicState = argmax{ SAFE: σ(−arousal), MOBILIZED: σ(arousal−0.4)×threatFlag,
+// Math: autonomicState = argmax{ SAFE: σ(−arousal), MOBILIZED: σ(arousal−threshold)×threatFlag,
 //                                SHUTDOWN: σ(arousal−0.75)×(historyDepth/5) }
+// threshold = 0.4 − 0.2·load  (allostatic load lowers MOBILIZED trigger)
 // Precision_need *= stateMultiplier[autonomicState][need]
 
 type AutonomicState = "SAFE" | "MOBILIZED" | "SHUTDOWN";
@@ -239,13 +265,16 @@ function _sigmoid(x: number): number {
 function computeAutonomicState(
   arousal: number,
   stimulusType: string,
-  history: string[]
+  history: string[],
+  load: number = 0
 ): { state: AutonomicState; precisionMult: Record<string, number> } {
   const threatFlag = THREAT_STIMULI.has(stimulusType.toLowerCase()) ? 1 : 0;
   const historyDepth = Math.min(history.length, 5);
 
+  // Allostatic load lowers MOBILIZED threshold: 0.4 − 0.2·load
+  const mobilizedThreshold = 0.4 - 0.2 * load;
   const scoreSafe      = _sigmoid(-arousal + 0.5);           // peaks when arousal low
-  const scoreMobilized = _sigmoid(arousal - 0.4) * (0.5 + threatFlag * 0.5);
+  const scoreMobilized = _sigmoid(arousal - mobilizedThreshold) * (0.5 + threatFlag * 0.5);
   const scoreShutdown  = _sigmoid(arousal - 0.75) * (historyDepth / 5);
 
   let state: AutonomicState;
@@ -383,12 +412,15 @@ function computeForce(situation: Situation): [number, number] {
 
 // Select dominant attractor: winner = argmin_i (dist² / depth_i)
 // Deeper basins have larger effective capture radius.
+const ALLOSTATIC_LOAD_ATTRACTORS = new Set(["avoidance", "rumination", "hypervigilance"]);
+
 function selectAttractor(
   domain: string,
   personPos: [number, number],
   force: [number, number],
   person: Situation["person"],
-  narrative?: { agency: number; communion: number }
+  narrative?: { agency: number; communion: number },
+  load: number = 0
 ): { attractor: Attractor; depth: number } {
   const attractors = DOMAIN_ATTRACTORS[domain] ?? DOMAIN_ATTRACTORS.emotion;
 
@@ -418,6 +450,12 @@ function selectAttractor(
     if (narrative) {
       const alignment = computeNarrativeAlignment(a.name, narrative);
       depth *= (0.5 + alignment); // aligned ~×1.5, misaligned ~×0.5
+    }
+
+    // Allostatic load deepens avoidance/rumination/hypervigilance basins (McEwen 1998)
+    // Chronic stress history makes threat-avoidance attractors stickier → PTSD/burnout patterns
+    if (load > 0 && ALLOSTATIC_LOAD_ATTRACTORS.has(a.name)) {
+      depth *= (1 + load);
     }
 
     const dx = xF[0] - a.pos[0];
@@ -1590,6 +1628,10 @@ export function predict(situation: Situation): Response {
   const obs = stimulus.personalRelevance; // 0–1 observation
   const arousal = person.arousal ?? 0.5;   // precision multiplier
 
+  // ── Allostatic Load (McEwen 1998) ─────────────────────────────────
+  // Accumulated threat burden from history; downstream effects throughout.
+  const allostaticLoad = computeAllostaticLoad(person.history ?? []);
+
   // ── Active Inference Engine (Friston 2010) ────────────────────────
   // Primary driver: ALL behavior is surprise minimization.
   // Person-level precision gates downstream need-space inference.
@@ -1605,7 +1647,8 @@ export function predict(situation: Situation): Response {
   const { state: autonomicState, precisionMult } = computeAutonomicState(
     arousal,
     stimulus.type,
-    person.history ?? []
+    person.history ?? [],
+    allostaticLoad
   );
 
   // Build priors from person's needs (fall back to generic prior)
@@ -1630,7 +1673,10 @@ export function predict(situation: Situation): Response {
     const prior: NeedPrior = domainPriors[key] ?? NEED_PRIORS[key] ?? { expected: 0.4, precision: 1.0 };
     const traitMod = traitPrecisionMod(person.traits, key);
     const vagalMod = precisionMult[key] ?? 1.0; // polyvagal gate
-    const scaledPrecision = prior.precision * traitMod * (0.5 + arousal) * vagalMod * precisionScale;
+    // Allostatic load amplifies safety precision (McEwen 1998): chronic threat history
+    // → hair-trigger threat detection; precision_safety × (1 + 2·load)
+    const alloFactor = (key === "safety" && allostaticLoad > 0) ? (1 + 2 * allostaticLoad) : 1.0;
+    const scaledPrecision = prior.precision * traitMod * (0.5 + arousal) * vagalMod * precisionScale * alloFactor;
     // Prospect Theory value function for decision domain; standard |PE| otherwise.
     // v(Δ) amplifies losses 2.25× relative to equivalent gains, driving loss aversion.
     const pe = isDecisionDomain
@@ -1679,7 +1725,7 @@ export function predict(situation: Situation): Response {
   // Deep basins (trauma, habit, pathology) override behavior regardless of stimulus.
   const personPos = emotionalStateToPos(person.emotionalState, arousal);
   const force = computeForce(situation);
-  const { attractor, depth } = selectAttractor(domain, personPos, force, person, narrative);
+  const { attractor, depth } = selectAttractor(domain, personPos, force, person, narrative, allostaticLoad);
 
   // Deep attractors override behavior — willpower insufficient against deep basin
   if (depth >= ATTRACTOR_OVERRIDE_DEPTH) {
@@ -1694,7 +1740,7 @@ export function predict(situation: Situation): Response {
 
   const baseResponse: Response = {
     rootCause: `${dominantNeed} need [${domain}] — PE=${pe.toFixed(2)}, basin=${attractor.name}${depth >= ATTRACTOR_OVERRIDE_DEPTH ? " [locked]" : ""}`,
-    process: `active-inference+attractor: F=${maxF.toFixed(3)}, PE=${pe.toFixed(2)}, ${attractorTag}, ${vagalTag}, ${narrativeTag}, arousal=${arousal}`,
+    process: `active-inference+attractor: F=${maxF.toFixed(3)}, PE=${pe.toFixed(2)}, ${attractorTag}, ${vagalTag}, ${narrativeTag}, arousal=${arousal}${allostaticLoad > 0 ? `, alloLoad=${allostaticLoad.toFixed(2)}` : ""}`,
     emotion,
     behavior,
     confidence,
