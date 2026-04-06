@@ -1,0 +1,14 @@
+{
+  "@context": "sevo://v1",
+  "@type": "SeedImprovement",
+  "@id": "evolution-cycle-5-1775476170961",
+  "timestamp": "2026-04-06T11:49:30.961Z",
+  "observation": "Cycle 5: 1 models, best=0.238, weakness: **Single biggest weakness:** The model assumes ALL behavior minimizes surprise via active inference,",
+  "suggestion": "Focus on: **Single biggest weakness:** The model assumes ALL behavior minimizes surprise via active inference, but fails catastrophically on self-harm, addictio",
+  "evidence": [
+    "cycle:5",
+    "best-fitness:0.238",
+    "population:1"
+  ],
+  "priority": 5
+}
